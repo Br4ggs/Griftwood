@@ -396,3 +396,11 @@ FodyWeavers.xsd
 
 # JetBrains Rider
 *.sln.iml
+
+# SDL dependency
+deps/SDL2-2.28.2/cmake
+deps/SDL2-2.28.2/docs
+deps/SDL2-2.28.2/lib/x64/SDL2.dll
+!deps/SDL2-2.28.2/include
+!deps/SDL2-2.28.2/lib/x64
+

@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <SDL.h>
 
 int main(int argc, char* args[])
 {
 	printf("hello world!");
-	return 0;
+	return SDL_Init(SDL_INIT_VIDEO);
 }
