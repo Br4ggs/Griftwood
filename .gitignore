@@ -404,3 +404,8 @@ deps/SDL2-2.28.2/lib/x64/SDL2.dll
 !deps/SDL2-2.28.2/include
 !deps/SDL2-2.28.2/lib/x64
 
+# SDL image dependency
+deps/SDL2_image-2.6.3/cmake
+deps/SDL2_image-2.6.3/lib/x64/SDL2_image.dll
+!deps/SDL2_image-2.6.3/include
+!deps/SDL2_image-2.6.3/lib/x64
