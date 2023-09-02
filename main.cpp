@@ -16,12 +16,18 @@ const int mapWidth = 16;
 const float FOV = 3.14159 / 4.0;
 const float maxDepth = 12.0f;
 
+//Player constants
+const float walkSpeed = 5.0f;
+
 //Player position
 float playerX = 8.5f;
 float playerY = 7.5f;
 float playerA = 0.0f;
 
 std::wstring map;
+
+//SDL constants
+const Uint8* keystates = SDL_GetKeyboardState(NULL);
 
 //SDL stuff
 SDL_Window* window = NULL;
@@ -61,14 +67,79 @@ int main(int argc, char* args[])
 	bool quit = false;
 	SDL_Event e;
 
+	Uint32 ticksCount = 0;
 	while (!quit)
 	{
+		//TODO: fix performance?
+		//calculate delta time
+		float deltaTime = (SDL_GetTicks() - ticksCount) / 1000.0f;
+		ticksCount = SDL_GetTicks();
+
 		//TODO: input code for moving player
+		//also TODO: only process one input event per loop iteration
 		while (SDL_PollEvent(&e) != 0)
 		{
 			if (e.type == SDL_QUIT)
 			{
 				quit = true;
+			}
+		}
+
+		//rotation
+		if (keystates[SDL_SCANCODE_Q])
+		{
+			playerA -= 1.0f * deltaTime;
+		}
+		if (keystates[SDL_SCANCODE_E])
+		{
+			playerA += 1.0f * deltaTime;
+		}
+
+		//forward/backward
+		if (keystates[SDL_SCANCODE_W])
+		{
+			playerX += sinf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
+			playerY += cosf(playerA) * walkSpeed * deltaTime;
+
+			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			{
+				playerX -= sinf(playerA) * walkSpeed * deltaTime;
+				playerY -= cosf(playerA) * walkSpeed * deltaTime;
+			}
+		}
+		if (keystates[SDL_SCANCODE_S])
+		{
+			playerX -= sinf(playerA) * walkSpeed * deltaTime;
+			playerY -= cosf(playerA) * walkSpeed * deltaTime;
+
+			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			{
+				playerX += sinf(playerA) * walkSpeed * deltaTime;
+				playerY += cosf(playerA) * walkSpeed * deltaTime;
+			}
+		}
+
+		//strafing
+		if (keystates[SDL_SCANCODE_D])
+		{
+			playerX += cosf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
+			playerY -= sinf(playerA) * walkSpeed * deltaTime;
+
+			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			{
+				playerX -= cosf(playerA) * walkSpeed * deltaTime;
+				playerY += sinf(playerA) * walkSpeed * deltaTime;
+			}
+		}
+		if (keystates[SDL_SCANCODE_A])
+		{
+			playerX -= cosf(playerA) * walkSpeed * deltaTime;
+			playerY += sinf(playerA) * walkSpeed * deltaTime;
+
+			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			{
+				playerX += cosf(playerA) * walkSpeed * deltaTime;
+				playerY -= sinf(playerA) * walkSpeed * deltaTime;
 			}
 		}
 
@@ -79,19 +150,6 @@ int main(int argc, char* args[])
 		SDL_RenderClear(renderer);
 
 		render();
-
-		//SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
-		//SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
-
-		/*for (int i = 0; i < SCREEN_HEIGHT; i++)
-		{
-			for (int j = 0; j < SCREEN_WIDTH / 2; j++)
-			{
-				SDL_RenderDrawPoint(renderer, j, i);
-			}
-		}*/
-
-		//SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
 		SDL_RenderPresent(renderer);
 	}
