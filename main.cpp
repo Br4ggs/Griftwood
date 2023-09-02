@@ -37,8 +37,10 @@ SDL_Renderer* renderer = NULL;
 bool init();
 void close();
 
+void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b);
 void render();
 
+//drawing each pixel individually is super slow
 int main(int argc, char* args[])
 {
 	map += L"################";
@@ -145,13 +147,14 @@ int main(int argc, char* args[])
 
 
 		// main loop
-		SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
-
-		SDL_RenderClear(renderer);
-
+		//SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+		//SDL_RenderClear(renderer);
+		
+		SDL_FillRect(screen, NULL, 0xFFFFFFFF);
 		render();
 
-		SDL_RenderPresent(renderer);
+		//SDL_RenderPresent(renderer);
+		SDL_UpdateWindowSurface(window);
 	}
 
 	close();
@@ -189,6 +192,7 @@ bool init()
 	}
 
 	screen = SDL_GetWindowSurface(window);
+	//SDL_PixelFormat* format = screen->format;
 	return true;
 }
 
@@ -205,6 +209,24 @@ void close()
 
 	IMG_Quit;
 	SDL_Quit();
+}
+
+//Blue component mask:
+//00000000000000000000000011111111
+//Green component mask:
+//00000000000000001111111100000000
+//Red component mask:
+//00000000111111110000000000000000
+//guessing it has no alpha component?
+void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b)
+{
+	//Convert the pixels to 32 bit
+	Uint32* pixels = (Uint32*)surface->pixels;
+
+	Uint32 pixel = b | (g << 8) | (r << 16);
+
+	//Set the pixel
+	pixels[(y * surface->w) + x] = pixel;
 }
 
 void render()
@@ -318,28 +340,39 @@ void render()
 		if (floor >= SCREEN_HEIGHT) floor = SCREEN_HEIGHT - 1;
 
 		//float wallX; //sample coordinate for texture, normalized
+		Uint8 r = 0;
+		Uint8 g = 0;
+		Uint8 b = 0;
+
 		if (side == 0) //use y-coordinate
 		{
 			//wallX = playerY + perpWallDist * vectorY;
 			//set draw color to green
-			SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
+			//SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
+			r = 0x00;
+			g = 0xFF;
+			b = 0x00;
 		}
 		else //use x-coordinate
 		{
 			//wallX = playerX + perpWallDist * vectorX;
 			//set draw color to red
-			SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+			//SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
+			r = 0xFF;
+			g = 0x00;
+			b = 0x00;
 		}
 
 		for (int y = ceiling; y <= floor; y++)
 		{
+			set_pixel(screen, x, y, r, g, b);
 			//if (perpWallDist < maxDepth)
 			//{
 				//float texY = texPos;
 				//Draw(x, y, spriteWall->SampleGlyph(texX, texY), spriteWall->SampleColour(texX, texY));
 				//texPos += step;
 				//draw wall
-				SDL_RenderDrawPoint(renderer, x, y);
+				//SDL_RenderDrawPoint(renderer, x, y);
 
 			//}
 			//else //primarily doing this to prevent any weird rendering due to rounding errors from far distances
