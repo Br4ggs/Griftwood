@@ -5,6 +5,10 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
+//TODO:
+//[ ] load images using surfaces (see if you can render them to screen
+//[ ] do textured map rendering
+
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -34,10 +38,15 @@ SDL_Window* window = NULL;
 SDL_Surface* screen = NULL;
 SDL_Renderer* renderer = NULL;
 
+//used sprites
+SDL_Surface* blueWallSprite = NULL;
+SDL_Surface* woodPanelSprite = NULL;
+
 bool init();
 void close();
 
 void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b);
+SDL_Surface* loadSurface(std::string path);
 void render();
 
 //drawing each pixel individually is super slow
@@ -151,7 +160,10 @@ int main(int argc, char* args[])
 		//SDL_RenderClear(renderer);
 		
 		SDL_FillRect(screen, NULL, 0xFFFFFFFF);
-		render();
+
+		render(); //TODO: screen as a parameter
+
+		//SDL_BlitSurface(blueWallSprite, NULL, screen, NULL);
 
 		//SDL_RenderPresent(renderer);
 		SDL_UpdateWindowSurface(window);
@@ -176,13 +188,13 @@ bool init()
 		return false;
 	}
 
-	if ((renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)) == NULL)
-	{
-		printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
-		return false;
-	}
+	//if ((renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)) == NULL)
+	//{
+	//	printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
+	//	return false;
+	//}
 
-	SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
+	//SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 
 	int imgFlags = IMG_INIT_PNG;
 	if (!(IMG_Init(imgFlags) & imgFlags))
@@ -192,6 +204,10 @@ bool init()
 	}
 
 	screen = SDL_GetWindowSurface(window);
+
+	blueWallSprite = loadSurface("./sprites/bluestone.png");
+	woodPanelSprite = loadSurface("./sprites/wood.png");
+
 	//SDL_PixelFormat* format = screen->format;
 	return true;
 }
@@ -201,8 +217,8 @@ void close()
 	SDL_FreeSurface(screen);
 	screen = NULL;
 
-	SDL_DestroyRenderer(renderer);
-	renderer = NULL;
+	//SDL_DestroyRenderer(renderer);
+	//renderer = NULL;
 
 	SDL_DestroyWindow(window);
 	window = NULL;
@@ -227,6 +243,25 @@ void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b)
 
 	//Set the pixel
 	pixels[(y * surface->w) + x] = pixel;
+}
+
+SDL_Surface* loadSurface(std::string path)
+{
+	SDL_Surface* optimizedSurface = NULL;
+	SDL_Surface* loadedSurface;
+	if ((loadedSurface = IMG_Load(path.c_str())) == NULL)
+	{
+		printf("ERROR: unable to load image: %s, SDL_image Error: %s\n", path.c_str(), IMG_GetError());
+		return NULL;
+	}
+	
+	if ((optimizedSurface = SDL_ConvertSurface(loadedSurface, screen->format, 0)) == NULL)
+	{
+		printf("ERROR: unable to optimize image: %s, SDL_image Error: %s\n", path.c_str(), SDL_GetError());
+		return NULL;
+	}
+
+	return optimizedSurface;
 }
 
 void render()
