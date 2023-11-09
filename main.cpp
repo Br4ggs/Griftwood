@@ -46,6 +46,8 @@ bool init();
 void close();
 
 void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b);
+void set_pixel(SDL_Surface* surface, int x, int y, Uint32 pixel);
+
 SDL_Surface* loadSurface(std::string path);
 void render();
 
@@ -245,6 +247,15 @@ void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b)
 	pixels[(y * surface->w) + x] = pixel;
 }
 
+void set_pixel(SDL_Surface* surface, int x, int y, Uint32 pixel)
+{
+	//Convert the pixels to 32 bit
+	Uint32* pixels = (Uint32*)surface->pixels;
+
+	//Set the pixel
+	pixels[(y * surface->w) + x] = pixel;
+}
+
 SDL_Surface* loadSurface(std::string path)
 {
 	SDL_Surface* optimizedSurface = NULL;
@@ -379,9 +390,10 @@ void render()
 		Uint8 g = 0;
 		Uint8 b = 0;
 
+		double wallX;
 		if (side == 0) //use y-coordinate
 		{
-			//wallX = playerY + perpWallDist * vectorY;
+			wallX = playerY + perpWallDist * vectorY;
 			//set draw color to green
 			//SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
 			r = 0x00;
@@ -390,7 +402,7 @@ void render()
 		}
 		else //use x-coordinate
 		{
-			//wallX = playerX + perpWallDist * vectorX;
+			wallX = playerX + perpWallDist * vectorX;
 			//set draw color to red
 			//SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
 			r = 0xFF;
@@ -398,9 +410,31 @@ void render()
 			b = 0x00;
 		}
 
+		//wallX gotta be normalized
+		wallX -= std::floor(wallX);
+
+		int texX = int(wallX * double(woodPanelSprite->w));
+
+		double step = 1.0 * woodPanelSprite->h / lineheight;
+
+		double texPos = (ceiling - SCREEN_HEIGHT / 2 + lineheight / 2) * step;
 		for (int y = ceiling; y <= floor; y++)
 		{
-			set_pixel(screen, x, y, r, g, b);
+			//mask with (texHeight - 1) in case of overflow?
+			int texY = (int)texPos & (woodPanelSprite->h - 1);
+			texPos += step;
+
+			Uint32* spritePixels = (Uint32*)woodPanelSprite->pixels;
+			
+			Uint32 pixel = spritePixels[(texY * woodPanelSprite->w) + texX];
+			if (side == 1)
+			{
+				//make pixel darker for Y sides of the maze by a color shift
+				pixel = (pixel >> 1) & 8355711;
+			}
+
+			set_pixel(screen, x, y, pixel);
+
 			//if (perpWallDist < maxDepth)
 			//{
 				//float texY = texPos;
