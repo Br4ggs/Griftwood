@@ -285,8 +285,50 @@ void render()
 	float perpX = std::sinf(playerA + (3.14159f * 0.5f));
 	float perpY = std::cosf(playerA + (3.14159f * 0.5f));
 
-	//half the screen height? forgot what this was for
-	//float posZ = 0.5f * SCREEN_HEIGHT;
+	//vertical position of the camera
+	float posZ = 0.5f * SCREEN_HEIGHT;
+
+	//render the ceiling and floor
+	//TODO: research and improve
+	for (int y = 0; y < SCREEN_HEIGHT; y++)
+	{	
+		//2 vectors for leftmost and rightmost ray
+		float vector1X = dirX - perpX;
+		float vector1Y = dirY - perpY;
+		float vector2X = dirX + perpX;
+		float vector2Y = dirY + perpY;
+
+		//the current y-position, relative to the center of the screen (the horizon)
+		int p = y - SCREEN_HEIGHT * 0.5f;
+
+		//horizontal distance from the camera to the floor for the current row?
+		float rowDistance = posZ / p;
+
+		float floorStepX = rowDistance * (vector2X - vector1X) / (float)SCREEN_WIDTH;
+		float floorStepY = rowDistance * (vector2Y - vector1Y) / (float)SCREEN_WIDTH;
+
+		//coordinates in world-space of leftmost column, which we will update
+		float floorX = playerX + rowDistance * vector1X;
+		float floorY = playerY + rowDistance * vector1Y;
+
+		for (int x = 0; x < SCREEN_WIDTH; x++)
+		{
+			//texture coordinates, mask with (texHeight - 1) in case of overflow?
+			int texX = (int)(woodPanelSprite->w * (floorX - std::floor(floorX))) & (woodPanelSprite->h - 1);
+			int texY = (int)(woodPanelSprite->h * (floorY - std::floor(floorY))) & (woodPanelSprite->h - 1);
+
+			Uint32* spritePixels = (Uint32*)woodPanelSprite->pixels;
+			Uint32 pixel = spritePixels[(texY * woodPanelSprite->w) + texX];
+			set_pixel(screen, x, y, pixel);
+
+			pixel = spritePixels[(texY * woodPanelSprite->w) + texX];
+			pixel = (pixel >> 1) & 8355711; // make a bit darker;
+			set_pixel(screen, x, SCREEN_HEIGHT - y - 1, pixel);
+
+			floorX += floorStepX;
+			floorY += floorStepY;
+		}
+	}
 
 	//render the walls
 	for (int x = 0; x < SCREEN_WIDTH; x++)
@@ -413,20 +455,20 @@ void render()
 		//wallX gotta be normalized
 		wallX -= std::floor(wallX);
 
-		int texX = int(wallX * double(woodPanelSprite->w));
+		int texX = int(wallX * double(blueWallSprite->w));
 
-		double step = 1.0 * woodPanelSprite->h / lineheight;
+		double step = 1.0 * blueWallSprite->h / lineheight;
 
 		double texPos = (ceiling - SCREEN_HEIGHT / 2 + lineheight / 2) * step;
 		for (int y = ceiling; y <= floor; y++)
 		{
 			//mask with (texHeight - 1) in case of overflow?
-			int texY = (int)texPos & (woodPanelSprite->h - 1);
+			int texY = (int)texPos & (blueWallSprite->h - 1);
 			texPos += step;
 
-			Uint32* spritePixels = (Uint32*)woodPanelSprite->pixels;
+			Uint32* spritePixels = (Uint32*)blueWallSprite->pixels;
 			
-			Uint32 pixel = spritePixels[(texY * woodPanelSprite->w) + texX];
+			Uint32 pixel = spritePixels[(texY * blueWallSprite->w) + texX];
 			if (side == 1)
 			{
 				//make pixel darker for Y sides of the maze by a color shift
