@@ -207,8 +207,8 @@ bool init()
 
 	screen = SDL_GetWindowSurface(window);
 
-	blueWallSprite = loadSurface("./sprites/bluestone.png");
-	woodPanelSprite = loadSurface("./sprites/wood.png");
+	blueWallSprite = loadSurface("./sprites/masonwall_64px.png");
+	woodPanelSprite = loadSurface("./sprites/seaweed_64px.png");
 
 	//SDL_PixelFormat* format = screen->format;
 	return true;
