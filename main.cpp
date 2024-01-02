@@ -1,13 +1,11 @@
 #include <stdio.h>
 #include <string>
 #include <cmath>
+#include <vector>
+#include <algorithm>
 
 #include <SDL.h>
 #include <SDL_image.h>
-
-//TODO:
-//[ ] load images using surfaces (see if you can render them to screen
-//[ ] do textured map rendering
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
@@ -42,18 +40,38 @@ SDL_Renderer* renderer = NULL;
 SDL_Surface* blueWallSprite = NULL;
 SDL_Surface* woodPanelSprite = NULL;
 
+SDL_Surface* barrelSprite = NULL;
+SDL_Surface* pillarSprite = NULL;
+
+struct Object
+{
+	float x;
+	float y;
+	SDL_Surface* sprite;
+};
+
+std::vector<Object> objects;
+
 bool init();
 void close();
 
 void set_pixel(SDL_Surface* surface, int x, int y, Uint8 r, Uint8 g, Uint8 b);
 void set_pixel(SDL_Surface* surface, int x, int y, Uint32 pixel);
-
 SDL_Surface* loadSurface(std::string path);
+void sortSprites(std::vector<int>& order, std::vector<float>& distance, int count);
+
 void render();
 
 //drawing each pixel individually is super slow
 int main(int argc, char* args[])
 {
+	if (!init())
+	{
+		printf("ERROR: failed to initialize\n");
+		return -1;
+	}
+
+	//create map
 	map += L"################";
 	map += L"#..............#";
 	map += L"#.##.#.#.#.#.#.#";
@@ -71,11 +89,17 @@ int main(int argc, char* args[])
 	map += L"#..............#";
 	map += L"################";
 
-	if (!init())
+	//create objects inside map
+	objects =
 	{
-		printf("ERROR: failed to initialize\n");
-		return -1;
-	}
+		{2.5, 6.5, pillarSprite},
+		{4.5, 6.5, pillarSprite},
+		{2.5, 8.5, pillarSprite},
+		{4.5, 8.5, pillarSprite},
+		{14.0, 14.0, barrelSprite},
+		{10.0, 14.0, barrelSprite},
+		{9.0, 14.0, barrelSprite}
+	};
 
 	bool quit = false;
 	SDL_Event e;
@@ -158,6 +182,7 @@ int main(int argc, char* args[])
 
 
 		// main loop
+		//TODO: later using GPU rendering
 		//SDL_SetRenderDrawColor(renderer, 0xFF, 0xFF, 0xFF, 0xFF);
 		//SDL_RenderClear(renderer);
 		
@@ -190,6 +215,7 @@ bool init()
 		return false;
 	}
 
+	//TODO: later using GPU rendering
 	//if ((renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED)) == NULL)
 	//{
 	//	printf("Renderer could not be created! SDL Error: %s\n", SDL_GetError());
@@ -207,8 +233,12 @@ bool init()
 
 	screen = SDL_GetWindowSurface(window);
 
+	//load in all necessary textures
 	blueWallSprite = loadSurface("./sprites/masonwall_64px.png");
 	woodPanelSprite = loadSurface("./sprites/seaweed_64px.png");
+
+	barrelSprite = loadSurface("./sprites/barrel.png");
+	pillarSprite = loadSurface("./sprites/pillar.png");
 
 	//SDL_PixelFormat* format = screen->format;
 	return true;
@@ -275,18 +305,38 @@ SDL_Surface* loadSurface(std::string path)
 	return optimizedSurface;
 }
 
+void sortSprites(std::vector<int>& order, std::vector<float>& distance, int count)
+{
+	std::vector<std::pair<double, int>> sprites(count);
+	for (int i = 0; i < count; i++)
+	{
+		sprites[i].first = distance[i];
+		sprites[i].second = order[i];
+	}
+
+	std::sort(sprites.begin(), sprites.end());
+
+	for (int i = 0; i < count; i++)
+	{
+		distance[i] = sprites[count - i - 1].first;
+		order[i] = sprites[count - i - 1].second;
+	}
+}
+
 void render()
 {
 	//unit vector of player looking direction
 	float dirX = std::sinf(playerA);
 	float dirY = std::cosf(playerA);
 
-	//another unit vector perpendicular to the direction vector
+	//another unit vector perpendicular to the direction vector (camera plane)
 	float perpX = std::sinf(playerA + (3.14159f * 0.5f));
 	float perpY = std::cosf(playerA + (3.14159f * 0.5f));
 
 	//vertical position of the camera
 	float posZ = 0.5f * SCREEN_HEIGHT;
+
+	double zBuffer[SCREEN_WIDTH] = { 0 };
 
 	//render the ceiling and floor
 	//TODO: research and improve
@@ -491,6 +541,90 @@ void render()
 			//	//Draw(x, y, PIXEL_SOLID, FG_BLACK);
 			//	//draw black
 			//}
+		}
+
+		//update zbuffer using perpendicular wall distance
+		zBuffer[x] = perpWallDist;
+	}
+
+	//render objects
+	//TODO: optimize drawing call, remove divisions
+	//sort objects by distance
+	std::vector<int> objectOrder;
+	std::vector<float> objectDistance;
+
+	for (int i = 0; i < objects.size(); i++)
+	{
+		objectOrder.push_back(i);
+		//application of pythagoras theorem, we do not need the square root to sort using distances
+		objectDistance.push_back((playerX - objects[i].x) * (playerX - objects[i].x) + (playerY - objects[i].y) * (playerY - objects[i].y));
+	}
+
+	sortSprites(objectOrder, objectDistance, objects.size());
+
+	for (int i = 0; i < objects.size(); i++)
+	{
+		//TODO...
+		Object* object = &objects[objectOrder[i]];
+
+		//object position relative to player
+		float objectX = object->x - playerX;
+		float objectY = object->y - playerY;
+
+		//calculate determinant using camera matrix
+		// [ perpX dirX ] -1                                       [ dirY   -dirX ]
+		// [            ]       =  1/(perpX*dirY-dirX*perpY) *     [              ]
+		// [ perpY dirY ]                                          [ -perpY perpX ]
+
+		float invDeterminant = 1 / (perpX * dirY - dirX * perpY);
+
+		//see above matrix for second term?
+		float transformX = invDeterminant * (dirY * objectX - dirX * objectY);
+		float transformY = invDeterminant * (-perpY * objectX + perpX * objectY);
+
+		//?
+		int spriteScreenX = int((SCREEN_WIDTH / 2) * (1 + transformX / transformY));
+
+		//calculate height of the sprite on screen
+		//using transformY instead of real distance prevents fisheye?
+		int spriteHeight = abs(int(SCREEN_HEIGHT / transformY));
+		int drawStartY = -spriteHeight / 2 + SCREEN_HEIGHT / 2;
+		if (drawStartY < 0) drawStartY = 0;
+		int drawEndY = spriteHeight / 2 + SCREEN_HEIGHT / 2;
+		if (drawEndY >= SCREEN_HEIGHT) drawEndY = SCREEN_HEIGHT - 1;
+
+		//object aspect ratio?
+
+		//calculate width of sprite on screen
+		//we use the same calculation to keep a 1:1 aspect ratio for the dimensions of the sprite
+		int spriteWidth = abs(int(SCREEN_HEIGHT / transformY));
+		int drawStartX = -spriteWidth / 2 + spriteScreenX;
+		if (drawStartX < 0) drawStartX = 0;
+		int drawEndX = spriteWidth / 2 + spriteScreenX;
+		if (drawEndX >= SCREEN_WIDTH) drawEndX = SCREEN_WIDTH - 1;
+
+		for (int x = drawStartX; x < drawEndX; x++)
+		{
+			int texX = int(256 * (x - (-spriteWidth / 2 + spriteScreenX)) * object->sprite->w / spriteWidth) / 256;
+
+			if (transformY > 0 && x > 0 && x < SCREEN_WIDTH && transformY < zBuffer[x])
+			{
+				for (int y = drawStartY; y < drawEndY; y++)
+				{
+					int d = y * 256 - SCREEN_HEIGHT * 128 + spriteHeight * 128;
+					int texY = ((d * object->sprite->h) / spriteHeight) / 256;
+
+					//look up texture using texX and texY
+					Uint32* spritePixels = (Uint32*)object->sprite->pixels;
+					Uint32 pixel = spritePixels[(texY * object->sprite->w) + texX];
+
+					//if pixel is not black (transparent color) then draw it
+					if ((pixel & 0x00FFFFFF) != 0)
+					{
+						set_pixel(screen, x, y, pixel);
+					}
+				}
+			}
 		}
 	}
 }
