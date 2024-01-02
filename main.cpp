@@ -37,8 +37,9 @@ SDL_Surface* screen = NULL;
 SDL_Renderer* renderer = NULL;
 
 //used sprites
-SDL_Surface* blueWallSprite = NULL;
-SDL_Surface* woodPanelSprite = NULL;
+SDL_Surface* wallTexture = NULL;
+SDL_Surface* floorTexture = NULL;
+SDL_Surface* ceilingTexture = NULL;
 
 SDL_Surface* barrelSprite = NULL;
 SDL_Surface* pillarSprite = NULL;
@@ -234,8 +235,9 @@ bool init()
 	screen = SDL_GetWindowSurface(window);
 
 	//load in all necessary textures
-	blueWallSprite = loadSurface("./sprites/masonwall_64px.png");
-	woodPanelSprite = loadSurface("./sprites/seaweed_64px.png");
+	wallTexture = loadSurface("./sprites/masonwall_64px.png");
+	floorTexture = loadSurface("./sprites/seaweed_64px.png");
+	ceilingTexture = loadSurface("./sprites/stonewall_64px.png");
 
 	barrelSprite = loadSurface("./sprites/barrel.png");
 	pillarSprite = loadSurface("./sprites/pillar.png");
@@ -340,7 +342,7 @@ void render()
 
 	//render the ceiling and floor
 	//TODO: research and improve
-	for (int y = 0; y < SCREEN_HEIGHT; y++)
+	for (int y = SCREEN_HEIGHT - 1; y >= SCREEN_HEIGHT * 0.5f; y--)
 	{	
 		//2 vectors for leftmost and rightmost ray
 		float vector1X = dirX - perpX;
@@ -364,14 +366,16 @@ void render()
 		for (int x = 0; x < SCREEN_WIDTH; x++)
 		{
 			//texture coordinates, mask with (texHeight - 1) in case of overflow?
-			int texX = (int)(woodPanelSprite->w * (floorX - std::floor(floorX))) & (woodPanelSprite->h - 1);
-			int texY = (int)(woodPanelSprite->h * (floorY - std::floor(floorY))) & (woodPanelSprite->h - 1);
-
-			Uint32* spritePixels = (Uint32*)woodPanelSprite->pixels;
-			Uint32 pixel = spritePixels[(texY * woodPanelSprite->w) + texX];
+			int texX = (int)(floorTexture->w * (floorX - std::floor(floorX))) & (floorTexture->h - 1);
+			int texY = (int)(floorTexture->h * (floorY - std::floor(floorY))) & (floorTexture->h - 1);
+			Uint32* spritePixels = (Uint32*)floorTexture->pixels;
+			Uint32 pixel = spritePixels[(texY * floorTexture->w) + texX];
 			set_pixel(screen, x, y, pixel);
 
-			pixel = spritePixels[(texY * woodPanelSprite->w) + texX];
+			texX = (int)(ceilingTexture->w * (floorX - std::floor(floorX))) & (ceilingTexture->h - 1);
+			texY = (int)(ceilingTexture->h * (floorY - std::floor(floorY))) & (ceilingTexture->h - 1);
+			spritePixels = (Uint32*)ceilingTexture->pixels;
+			pixel = spritePixels[(texY * ceilingTexture->w) + texX];
 			pixel = (pixel >> 1) & 8355711; // make a bit darker;
 			set_pixel(screen, x, SCREEN_HEIGHT - y - 1, pixel);
 
@@ -505,20 +509,20 @@ void render()
 		//wallX gotta be normalized
 		wallX -= std::floor(wallX);
 
-		int texX = int(wallX * double(blueWallSprite->w));
+		int texX = int(wallX * double(wallTexture->w));
 
-		double step = 1.0 * blueWallSprite->h / lineheight;
+		double step = 1.0 * wallTexture->h / lineheight;
 
 		double texPos = (ceiling - SCREEN_HEIGHT / 2 + lineheight / 2) * step;
 		for (int y = ceiling; y <= floor; y++)
 		{
 			//mask with (texHeight - 1) in case of overflow?
-			int texY = (int)texPos & (blueWallSprite->h - 1);
+			int texY = (int)texPos & (wallTexture->h - 1);
 			texPos += step;
 
-			Uint32* spritePixels = (Uint32*)blueWallSprite->pixels;
+			Uint32* spritePixels = (Uint32*)wallTexture->pixels;
 			
-			Uint32 pixel = spritePixels[(texY * blueWallSprite->w) + texX];
+			Uint32 pixel = spritePixels[(texY * wallTexture->w) + texX];
 			if (side == 1)
 			{
 				//make pixel darker for Y sides of the maze by a color shift
@@ -548,7 +552,6 @@ void render()
 	}
 
 	//render objects
-	//TODO: optimize drawing call, remove divisions
 	//sort objects by distance
 	std::vector<int> objectOrder;
 	std::vector<float> objectDistance;
@@ -564,7 +567,6 @@ void render()
 
 	for (int i = 0; i < objects.size(); i++)
 	{
-		//TODO...
 		Object* object = &objects[objectOrder[i]];
 
 		//object position relative to player
@@ -583,29 +585,29 @@ void render()
 		float transformY = invDeterminant * (-perpY * objectX + perpX * objectY);
 
 		//?
-		int spriteScreenX = int((SCREEN_WIDTH / 2) * (1 + transformX / transformY));
+		int spriteScreenX = int((SCREEN_WIDTH * 0.5f) * (1 + transformX / transformY));
 
 		//calculate height of the sprite on screen
 		//using transformY instead of real distance prevents fisheye?
 		int spriteHeight = abs(int(SCREEN_HEIGHT / transformY));
-		int drawStartY = -spriteHeight / 2 + SCREEN_HEIGHT / 2;
+		int drawStartY = (-spriteHeight + SCREEN_HEIGHT) * 0.5f;
 		if (drawStartY < 0) drawStartY = 0;
-		int drawEndY = spriteHeight / 2 + SCREEN_HEIGHT / 2;
+		int drawEndY = (spriteHeight + SCREEN_HEIGHT) * 0.5f;
 		if (drawEndY >= SCREEN_HEIGHT) drawEndY = SCREEN_HEIGHT - 1;
 
-		//object aspect ratio?
+		//object aspect ratio
+		float objectAspectRatio = (float)object->sprite->w / (float)object->sprite->h;
 
 		//calculate width of sprite on screen
-		//we use the same calculation to keep a 1:1 aspect ratio for the dimensions of the sprite
-		int spriteWidth = abs(int(SCREEN_HEIGHT / transformY));
-		int drawStartX = -spriteWidth / 2 + spriteScreenX;
+		int spriteWidth = spriteHeight * objectAspectRatio;
+		int drawStartX = -spriteWidth * 0.5f + spriteScreenX;
 		if (drawStartX < 0) drawStartX = 0;
-		int drawEndX = spriteWidth / 2 + spriteScreenX;
+		int drawEndX = spriteWidth * 0.5f + spriteScreenX;
 		if (drawEndX >= SCREEN_WIDTH) drawEndX = SCREEN_WIDTH - 1;
 
 		for (int x = drawStartX; x < drawEndX; x++)
 		{
-			int texX = int(256 * (x - (-spriteWidth / 2 + spriteScreenX)) * object->sprite->w / spriteWidth) / 256;
+			int texX = int(256 * (x - (-spriteWidth * 0.5f + spriteScreenX)) * object->sprite->w / spriteWidth) / 256;
 
 			if (transformY > 0 && x > 0 && x < SCREEN_WIDTH && transformY < zBuffer[x])
 			{
