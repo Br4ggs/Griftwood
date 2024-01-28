@@ -344,6 +344,8 @@ void render()
 	//TODO: research and improve
 	for (int y = SCREEN_HEIGHT - 1; y >= SCREEN_HEIGHT * 0.5f; y--)
 	{	
+		uint8_t subtrackt = 225 - (uint8_t)(225.0f / (SCREEN_HEIGHT * 0.5) * y);
+
 		//2 vectors for leftmost and rightmost ray
 		float vector1X = dirX - perpX;
 		float vector1Y = dirY - perpY;
@@ -370,13 +372,35 @@ void render()
 			int texY = (int)(floorTexture->h * (floorY - std::floor(floorY))) & (floorTexture->h - 1);
 			Uint32* spritePixels = (Uint32*)floorTexture->pixels;
 			Uint32 pixel = spritePixels[(texY * floorTexture->w) + texX];
+
+			uint8_t b = pixel;
+			uint8_t g = (pixel >> 8);
+			uint8_t r = (pixel >> 16);
+
+			b = (subtrackt < b) ? b - subtrackt : 0;
+			g = (subtrackt < g) ? g - subtrackt : 0;
+			r = (subtrackt < r) ? r - subtrackt : 0;
+
+			pixel = pixel = b | (g << 8) | (r << 16);
+
 			set_pixel(screen, x, y, pixel);
 
 			texX = (int)(ceilingTexture->w * (floorX - std::floor(floorX))) & (ceilingTexture->h - 1);
 			texY = (int)(ceilingTexture->h * (floorY - std::floor(floorY))) & (ceilingTexture->h - 1);
 			spritePixels = (Uint32*)ceilingTexture->pixels;
 			pixel = spritePixels[(texY * ceilingTexture->w) + texX];
-			pixel = (pixel >> 1) & 8355711; // make a bit darker;
+			//pixel = (pixel >> 1) & 8355711; // make a bit darker;
+
+			b = pixel;
+			g = (pixel >> 8);
+			r = (pixel >> 16);
+
+			b = (subtrackt < b) ? b - subtrackt : 0;
+			g = (subtrackt < g) ? g - subtrackt : 0;
+			r = (subtrackt < r) ? r - subtrackt : 0;
+
+			pixel = pixel = b | (g << 8) | (r << 16);
+
 			set_pixel(screen, x, SCREEN_HEIGHT - y - 1, pixel);
 
 			floorX += floorStepX;
