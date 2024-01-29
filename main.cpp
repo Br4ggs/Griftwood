@@ -15,8 +15,10 @@ const int SCREEN_HEIGHT = 480;
 const int mapHeight = 16;
 const int mapWidth = 16;
 
+//Unused
 const float FOV = 3.14159 / 4.0;
-const float maxDepth = 12.0f;
+
+const float maxDepth = 3.0f;
 
 //Player constants
 const float walkSpeed = 5.0f;
@@ -288,6 +290,19 @@ void set_pixel(SDL_Surface* surface, int x, int y, Uint32 pixel)
 	pixels[(y * surface->w) + x] = pixel;
 }
 
+Uint32 darken_pixel(Uint32 pixel, Uint8 darken)
+{
+	Uint8 b = pixel;
+	Uint8 g = (pixel >> 8);
+	Uint8 r = (pixel >> 16);
+
+	b = (darken < b) ? b - darken : 0;
+	g = (darken < g) ? g - darken : 0;
+	r = (darken < r) ? r - darken : 0;
+
+	return b | (g << 8) | (r << 16);
+}
+
 SDL_Surface* loadSurface(std::string path)
 {
 	SDL_Surface* optimizedSurface = NULL;
@@ -344,7 +359,7 @@ void render()
 	//TODO: research and improve
 	for (int y = SCREEN_HEIGHT - 1; y >= SCREEN_HEIGHT * 0.5f; y--)
 	{	
-		uint8_t subtrackt = 225 - (uint8_t)(225.0f / (SCREEN_HEIGHT * 0.5) * y);
+		Uint8 subtract = 225 - (Uint8)(225.0f / (SCREEN_HEIGHT * 0.5) * y);
 
 		//2 vectors for leftmost and rightmost ray
 		float vector1X = dirX - perpX;
@@ -372,16 +387,7 @@ void render()
 			int texY = (int)(floorTexture->h * (floorY - std::floor(floorY))) & (floorTexture->h - 1);
 			Uint32* spritePixels = (Uint32*)floorTexture->pixels;
 			Uint32 pixel = spritePixels[(texY * floorTexture->w) + texX];
-
-			uint8_t b = pixel;
-			uint8_t g = (pixel >> 8);
-			uint8_t r = (pixel >> 16);
-
-			b = (subtrackt < b) ? b - subtrackt : 0;
-			g = (subtrackt < g) ? g - subtrackt : 0;
-			r = (subtrackt < r) ? r - subtrackt : 0;
-
-			pixel = pixel = b | (g << 8) | (r << 16);
+			pixel = darken_pixel(pixel, subtract);
 
 			set_pixel(screen, x, y, pixel);
 
@@ -390,16 +396,7 @@ void render()
 			spritePixels = (Uint32*)ceilingTexture->pixels;
 			pixel = spritePixels[(texY * ceilingTexture->w) + texX];
 			//pixel = (pixel >> 1) & 8355711; // make a bit darker;
-
-			b = pixel;
-			g = (pixel >> 8);
-			r = (pixel >> 16);
-
-			b = (subtrackt < b) ? b - subtrackt : 0;
-			g = (subtrackt < g) ? g - subtrackt : 0;
-			r = (subtrackt < r) ? r - subtrackt : 0;
-
-			pixel = pixel = b | (g << 8) | (r << 16);
+			pixel = darken_pixel(pixel, subtract);
 
 			set_pixel(screen, x, SCREEN_HEIGHT - y - 1, pixel);
 
@@ -506,9 +503,6 @@ void render()
 		if (floor >= SCREEN_HEIGHT) floor = SCREEN_HEIGHT - 1;
 
 		//float wallX; //sample coordinate for texture, normalized
-		Uint8 r = 0;
-		Uint8 g = 0;
-		Uint8 b = 0;
 
 		double wallX;
 		if (side == 0) //use y-coordinate
@@ -516,18 +510,12 @@ void render()
 			wallX = playerY + perpWallDist * vectorY;
 			//set draw color to green
 			//SDL_SetRenderDrawColor(renderer, 0x00, 0xFF, 0x00, 0xFF);
-			r = 0x00;
-			g = 0xFF;
-			b = 0x00;
 		}
 		else //use x-coordinate
 		{
 			wallX = playerX + perpWallDist * vectorX;
 			//set draw color to red
 			//SDL_SetRenderDrawColor(renderer, 0xFF, 0x00, 0x00, 0xFF);
-			r = 0xFF;
-			g = 0x00;
-			b = 0x00;
 		}
 
 		//wallX gotta be normalized
@@ -550,8 +538,12 @@ void render()
 			if (side == 1)
 			{
 				//make pixel darker for Y sides of the maze by a color shift
-				pixel = (pixel >> 1) & 8355711;
+				//pixel = (pixel >> 1) & 8355711;
 			}
+
+			float perpWallDistClamped = (perpWallDist < maxDepth) ? perpWallDist : maxDepth;
+			Uint8 subtract = (Uint8)((225.0f / maxDepth) * perpWallDistClamped);
+			pixel = darken_pixel(pixel, subtract);
 
 			set_pixel(screen, x, y, pixel);
 
