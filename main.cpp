@@ -359,7 +359,7 @@ void render()
 	//TODO: research and improve
 	for (int y = SCREEN_HEIGHT - 1; y >= SCREEN_HEIGHT * 0.5f; y--)
 	{	
-		Uint8 subtract = 225 - (Uint8)(225.0f / (SCREEN_HEIGHT * 0.5) * y);
+		Uint8 subtract = 255 - (Uint8)(255 / (SCREEN_HEIGHT * 0.5) * y);
 
 		//2 vectors for leftmost and rightmost ray
 		float vector1X = dirX - perpX;
@@ -542,7 +542,7 @@ void render()
 			}
 
 			float perpWallDistClamped = (perpWallDist < maxDepth) ? perpWallDist : maxDepth;
-			Uint8 subtract = (Uint8)((225.0f / maxDepth) * perpWallDistClamped);
+			Uint8 subtract = (Uint8)((255 / maxDepth) * perpWallDistClamped);
 			pixel = darken_pixel(pixel, subtract);
 
 			set_pixel(screen, x, y, pixel);
@@ -588,6 +588,9 @@ void render()
 		//object position relative to player
 		float objectX = object->x - playerX;
 		float objectY = object->y - playerY;
+		
+		//TODO: can we do this without expensive squareroot operations?
+		float dist = std::sqrt((objectX * objectX) + (objectY * objectY));
 
 		//calculate determinant using camera matrix
 		// [ perpX dirX ] -1                                       [ dirY   -dirX ]
@@ -636,9 +639,15 @@ void render()
 					Uint32* spritePixels = (Uint32*)object->sprite->pixels;
 					Uint32 pixel = spritePixels[(texY * object->sprite->w) + texX];
 
+					//the +2 is just so sprite objects are a little bit lighter then the rest of the surroundings
+					float distClamped = (dist < maxDepth + 2) ? dist : maxDepth + 2;
+					Uint8 subtract = (Uint8)((255 / (maxDepth + 2)) * distClamped);
+
 					//if pixel is not black (transparent color) then draw it
+					//TODO: use a different color for transparent stuff
 					if ((pixel & 0x00FFFFFF) != 0)
 					{
+						pixel = darken_pixel(pixel, subtract);
 						set_pixel(screen, x, y, pixel);
 					}
 				}
