@@ -22,10 +22,10 @@ private:
 		Origin,
 	};
 
-	int mapWidth;
-	int mapHeight;
-	int maxRoomWidth;
-	int maxRoomHeight;
+	const int mapWidth;
+	const int mapHeight;
+	const int maxRoomWidth;
+	const int maxRoomHeight;
 	int roomPlaceAttempts;
 
 	std::random_device rd;

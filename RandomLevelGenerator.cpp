@@ -2,6 +2,7 @@
 
 #include <random>
 #include <list>
+#include <stack>
 #include <tuple>
 
 //TODO: add none direction to enum and single boundary check function
@@ -140,7 +141,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	{
 		for (int x = 0; x < mapWidth; x++)
 		{
-			map[y * mapWidth + x] = std::make_pair('#', 0);
+			map[y * mapWidth + x] = std::make_pair('#', -1);
 		}
 	}
 
@@ -152,7 +153,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	std::uniform_int_distribution<> roomX(1, mapWidth - 1);
 	std::uniform_int_distribution<> roomY(1, mapHeight - 1);
 
-	int id = 1;
+	int id = -1;
 	for (int i = 0; i < roomPlaceAttempts; i++)
 	{
 		int roomHeight = roomHeightDistr(gen);
@@ -179,11 +180,56 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 				map[yOffset * mapWidth + xOffset].second = id;
 			}
 		}
-
-		id++;
 	}
 
+	id = 0;
+
+	//merge rooms
+	//TODO make this safe
+	bool* visited = (bool*)malloc(sizeof(bool) * mapHeight * mapWidth);
+	memset(visited, false, sizeof(bool) * mapHeight * mapWidth);
+
+	for (int y = 1; y < mapHeight - 1; y++)
+	{
+		for (int x = 1; x < mapWidth- 1; x++)
+		{
+			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == -1)
+			{
+				std::stack<std::pair<int, int>> stack;
+				stack.emplace(std::make_pair(y, x));
+
+				while (!stack.empty())
+				{
+					std::pair<int, int> currentTile = stack.top();
+					stack.pop();
+
+					if (visited[currentTile.first * mapWidth + currentTile.second]) continue;
+
+					visited[currentTile.first * mapWidth + currentTile.second] = true;
+
+					map[currentTile.first * mapWidth + currentTile.second].second = id;
+
+					if (map[(currentTile.first - 1) * mapWidth + currentTile.second].first == '.') //up
+						stack.emplace(std::make_pair(currentTile.first - 1, currentTile.second));
+
+					if (map[(currentTile.first + 1) * mapWidth + currentTile.second].first == '.') //down
+						stack.emplace(std::make_pair(currentTile.first + 1, currentTile.second));
+
+					if (map[(currentTile.first) * mapWidth + (currentTile.second - 1)].first == '.') //left
+						stack.emplace(std::make_pair(currentTile.first, currentTile.second - 1));
+
+					if (map[(currentTile.first) * mapWidth + (currentTile.second + 1)].first == '.') //right
+						stack.emplace(std::make_pair(currentTile.first, currentTile.second + 1));
+				}
+
+				id++;			
+			}
+		}
+	}
+	free(visited);
+
 	//floodfill
+	//BUGBUG
 	for (int y = 1; y < mapHeight; y++)
 	{
 		for (int x = 1; x < mapWidth; x++)
@@ -198,8 +244,6 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 			}
 		}
 	}
-
-	//merge rooms
 
 	//create connections
 
