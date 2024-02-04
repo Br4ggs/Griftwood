@@ -136,12 +136,14 @@ RandomLevelGenerator::RandomLevelGenerator(int mapWidth, int mapHeight, int maxR
 
 void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spawnX, int& spawnY)
 {
+	int id = -1;
+
 	//clear map buffer
 	for (int y = 0; y < mapHeight; y++)
 	{
 		for (int x = 0; x < mapWidth; x++)
 		{
-			map[y * mapWidth + x] = std::make_pair('#', -1);
+			map[y * mapWidth + x] = std::make_pair('#', id);
 		}
 	}
 
@@ -153,7 +155,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	std::uniform_int_distribution<> roomX(1, mapWidth - 1);
 	std::uniform_int_distribution<> roomY(1, mapHeight - 1);
 
-	int id = -1;
+	id = 0;
 	for (int i = 0; i < roomPlaceAttempts; i++)
 	{
 		int roomHeight = roomHeightDistr(gen);
@@ -182,7 +184,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 		}
 	}
 
-	id = 0;
+	id++;
 
 	//merge rooms
 	//TODO make this safe
@@ -191,7 +193,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 
 	for (int y = 1; y < mapHeight - 1; y++)
 	{
-		for (int x = 1; x < mapWidth- 1; x++)
+		for (int x = 1; x < mapWidth - 1; x++)
 		{
 			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == -1)
 			{
@@ -229,10 +231,9 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	free(visited);
 
 	//floodfill
-	//BUGBUG
-	for (int y = 1; y < mapHeight; y++)
+	for (int y = 1; y < mapHeight - 1; y++)
 	{
-		for (int x = 1; x < mapWidth; x++)
+		for (int x = 1; x < mapWidth - 1; x++)
 		{
 			int xStart, xEnd, yStart, yEnd;
 			GetBoundingRectangle(xStart, xEnd, yStart, yEnd, Direction::Origin);
