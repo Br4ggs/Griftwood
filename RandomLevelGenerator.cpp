@@ -7,7 +7,7 @@
 #include <stack>
 #include <tuple>
 
-//TODO: add none direction to enum and single boundary check function
+//TODO: add constants for id's for walls, passageways(?) and rooms(?)
 
 void RandomLevelGenerator::GetBoundingRectangle(int &xStart, int &xEnd, int &yStart, int &yEnd, Direction dir)
 {
@@ -132,9 +132,9 @@ void RandomLevelGenerator::GeneratePassageWays(int xOrigin, int yOrigin, int id)
 
 void RandomLevelGenerator::CreateConnections()
 {
-//	//create connections
-//	//shits ridiculous
-//	//y-coordinate, x-coordinate, first region id, second region id
+	//create connections
+	//shits ridiculous
+	//y-coordinate, x-coordinate, first region id, second region id
 	std::list<std::tuple<int, int, int, int>> connections;
 
 	for (int y = 1; y < mapHeight - 1; y++)
@@ -167,9 +167,7 @@ void RandomLevelGenerator::CreateConnections()
 		}
 	}
 
-	std::uniform_int_distribution<> connectionDistribution(1, 3); //parameterize this
-
-	//BUGBUG: some connections are still left out?
+	std::uniform_int_distribution<> connectionDistribution(1, 4); //parameterize this
 
 	while (!connections.empty())
 	{
@@ -234,6 +232,52 @@ void RandomLevelGenerator::CreateConnections()
 
 		connections.clear();
 		std::copy(difference.begin(), difference.end(), std::back_inserter(connections));
+	}
+}
+
+void RandomLevelGenerator::TrimEnds(const int iterations)
+{
+	//(y,x)
+	std::list<std::pair<int, int>> newWalls;
+
+	for (int i = 0; i < iterations; i++)
+	{
+		newWalls.clear();
+
+		for (int y = 0; y < mapHeight - 1; y++)
+		{
+			for (int x = 0; x < mapWidth - 1; x++)
+			{
+				if (map[y * mapWidth + x].first == '#') continue;
+
+				int walls = 0;
+
+				//this pattern appears quite often, maybe create a utility function for this that can evaluate lambdas?
+				for (int yOffset = -1; yOffset <= 1; yOffset++)
+				{
+					for (int xOffset = -1; xOffset <= 1; xOffset++)
+					{
+						if (yOffset == xOffset || yOffset == -xOffset) continue;
+
+						if (map[(y + yOffset) * mapWidth + (x + xOffset)].first == '#')
+						{
+							walls++;
+						}
+					}
+				}
+
+				if (walls > 2)
+				{
+					newWalls.push_back(std::make_pair(y, x));
+				}
+			}
+		}
+
+		std::for_each(newWalls.begin(), newWalls.end(), [=](std::pair<int, int> elem)
+			{
+				map[elem.first * mapWidth + elem.second].first = '#';
+				map[elem.first * mapWidth + elem.second].second = -1;
+			});
 	}
 }
 
@@ -353,6 +397,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	CreateConnections();
 
 	//trim ends
+	TrimEnds(15);
 
 	//remove unnecessary walls
 	

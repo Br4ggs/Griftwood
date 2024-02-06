@@ -43,5 +43,6 @@ private:
 	bool CanPlaceTunnel(int x, int y, int xStart, int xEnd, int yStart, int yEnd);
 	void GeneratePassageWays(int x, int y, int id);
 	void CreateConnections();
+	void TrimEnds(const int iterations);
 };
 
