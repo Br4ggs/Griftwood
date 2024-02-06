@@ -7,6 +7,8 @@
 #include <SDL.h>
 #include <SDL_image.h>
 
+#include "RandomLevelGenerator.h"
+
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -25,6 +27,8 @@ const float walkSpeed = 5.0f;
 float playerX = 8.5f;
 float playerY = 7.5f;
 float playerA = 0.0f;
+
+RandomLevelGenerator levelGenerator(40, 40, 5, 5, 25);
 
 std::wstring map;
 
@@ -72,23 +76,32 @@ int main(int argc, char* args[])
 		return -1;
 	}
 
+	//BUGBUG: something weird going on with this map, check spawn position
+	uint16_t spawnX = 0;
+	uint16_t spawnY = 0;
+
+	levelGenerator.GenerateRandomLevel(map, (uint16_t &)spawnX, (uint16_t &)spawnY);
+
+	playerX = spawnX + 0.5f;
+	playerY = spawnY + 0.5f;
+
 	//create map
-	map += L"################";
-	map += L"#..............#";
-	map += L"#.##.#.#.#.#.#.#";
-	map += L"#.#............#";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"#......#.#......";
-	map += L"#...............";
-	map += L"#......#.#......";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"#...........####";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"################";
+	//map += L"################";
+	//map += L"#..............#";
+	//map += L"#.##.#.#.#.#.#.#";
+	//map += L"#.#............#";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"#......#.#......";
+	//map += L"#...............";
+	//map += L"#......#.#......";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"#...........####";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"################";
 
 	//create objects inside map
 	objects =

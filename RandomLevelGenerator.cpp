@@ -318,12 +318,6 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 		uint16_t roomColumn = roomX(gen);
 		uint16_t roomRow = roomY(gen);
 
-		if (!playerPlaced)
-		{
-			spawnX = roomColumn;
-			spawnY = roomRow;
-		}
-
 		//TODO: just make this roomHeight not roomHeight * 2
 		//i was fucking high when i wrote this aight
 		for (int y = -roomHeight; y <= roomHeight; y++)
@@ -341,6 +335,13 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 				map[yOffset * mapWidth + xOffset].first = '.';
 				map[yOffset * mapWidth + xOffset].second = id;
 			}
+		}
+
+		if (!playerPlaced)
+		{
+			spawnX = roomColumn;
+			spawnY = roomRow;
+			playerPlaced = true;
 		}
 	}
 
@@ -407,6 +408,8 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 	TrimEnds(15);
 
 	//remove unnecessary walls
+
+	//map[spawnY * mapWidth + spawnX].first = '@';
 	
 	stringMap.clear();
 
