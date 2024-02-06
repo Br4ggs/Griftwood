@@ -235,19 +235,6 @@ void RandomLevelGenerator::CreateConnections()
 		connections.clear();
 		std::copy(difference.begin(), difference.end(), std::back_inserter(connections));
 	}
-//
-//	//while there are connections left
-//	//shuffle the list
-//	//filter all connections that have the same ids as connection 0, shuffle list
-//	//place at between 1 and 3 connections from shuffled list
-//	//check boundaries but ignore diagonals and this tile
-//	//count the surrounding floor tiles
-//	//if more than 2 floors, skip
-//	//remove from the original list the filtered list (set difference)
-//	// 
-//	//TODO: keep track of which tiles are rooms
-//	//TODO: how to distinguish between passages and rooms?
-//	//TODO: how to check when you can connect both vertically or horizontally?
 }
 
 RandomLevelGenerator::RandomLevelGenerator(int mapWidth, int mapHeight, int maxRoomWidth, int maxRoomHeight, int roomPlaceAttempts)
@@ -307,14 +294,9 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	}
 
 	int unsetId = id;
-
 	id++;
 
 	//merge rooms
-	//TODO make this safe
-	bool* visited = (bool*)malloc(sizeof(bool) * mapHeight * mapWidth);
-	memset(visited, false, sizeof(bool) * mapHeight * mapWidth);
-
 	for (int y = 1; y < mapHeight - 1; y++)
 	{
 		for (int x = 1; x < mapWidth - 1; x++)
@@ -329,9 +311,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 					std::pair<int, int> currentTile = stack.top();
 					stack.pop();
 
-					if (visited[currentTile.first * mapWidth + currentTile.second]) continue;
-
-					visited[currentTile.first * mapWidth + currentTile.second] = true;
+					if (map[currentTile.first * mapWidth + currentTile.second].second != unsetId) continue;
 
 					map[currentTile.first * mapWidth + currentTile.second].second = id;
 
@@ -352,7 +332,6 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 			}
 		}
 	}
-	free(visited);
 
 	//floodfill
 	for (int y = 1; y < mapHeight - 1; y++)
@@ -366,6 +345,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 			{
 				//generate passage ways
 				GeneratePassageWays(x, y, id);
+				id++;
 			}
 		}
 	}
