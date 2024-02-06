@@ -42,5 +42,6 @@ private:
 	void GetBoundingRectangle(int& xStart, int& xEnd, int& yStart, int& yEnd, Direction dir);
 	bool CanPlaceTunnel(int x, int y, int xStart, int xEnd, int yStart, int yEnd);
 	void GeneratePassageWays(int x, int y, int id);
+	void CreateConnections();
 };
 

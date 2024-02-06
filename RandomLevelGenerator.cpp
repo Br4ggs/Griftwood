@@ -1,6 +1,8 @@
 #include "RandomLevelGenerator.h"
 
 #include <random>
+#include <algorithm>
+#include <iterator>
 #include <list>
 #include <stack>
 #include <tuple>
@@ -46,7 +48,6 @@ void RandomLevelGenerator::GetBoundingRectangle(int &xStart, int &xEnd, int &ySt
 			xEnd = 0;
 			yStart = 0;
 			yEnd = 0;
-
 	}
 }
 
@@ -70,6 +71,7 @@ bool RandomLevelGenerator::CanPlaceTunnel(int x, int y, int xStart, int xEnd, in
 }
 
 //precondition: CanPlaceTunnel(x,y) == true
+//TODO: this is sluggish as shit. see if you can maybe optimize this
 void RandomLevelGenerator::GeneratePassageWays(int xOrigin, int yOrigin, int id)
 {
 	std::list<std::tuple<int, int, Direction>> possiblePassageWays;
@@ -128,6 +130,126 @@ void RandomLevelGenerator::GeneratePassageWays(int xOrigin, int yOrigin, int id)
 	}
 }
 
+void RandomLevelGenerator::CreateConnections()
+{
+//	//create connections
+//	//shits ridiculous
+//	//y-coordinate, x-coordinate, first region id, second region id
+	std::list<std::tuple<int, int, int, int>> connections;
+
+	for (int y = 1; y < mapHeight - 1; y++)
+	{
+		for (int x = 1; x < mapWidth - 1; x++)
+		{
+			if (map[y * mapWidth + x].first == '.') continue;
+
+			//wall vertically connects 2 spaces
+			if (map[(y - 1) * mapWidth + x].first == '.' &&
+				map[(y + 1) * mapWidth + x].first == '.' &&
+				map[(y - 1) * mapWidth + x].second != map[(y + 1) * mapWidth + x].second)
+			{
+				//store in list with coordinates, and 2 region id's?
+				int firstId = std::min(map[(y - 1) * mapWidth + x].second, map[(y + 1) * mapWidth + x].second);
+				int secondId = std::max(map[(y - 1) * mapWidth + x].second, map[(y + 1) * mapWidth + x].second);
+				connections.push_back(std::make_tuple(y, x, firstId, secondId));
+			}
+
+			//wall horizontally connects 2 spaces
+			else if (map[y * mapWidth + (x - 1)].first == '.' &&
+				map[y * mapWidth + (x + 1)].first == '.' &&
+				map[y * mapWidth + (x - 1)].second != map[y * mapWidth + (x + 1)].second)
+			{
+				//store in list with coordinates, and 2 region id's?
+				int firstId = std::min(map[y * mapWidth + (x - 1)].second, map[y * mapWidth + (x + 1)].second);
+				int secondId = std::max(map[y * mapWidth + (x - 1)].second, map[y * mapWidth + (x + 1)].second);
+				connections.push_back(std::make_tuple(y, x, firstId, secondId));
+			}
+		}
+	}
+
+	std::uniform_int_distribution<> connectionDistribution(1, 3); //parameterize this
+
+	//BUGBUG: some connections are still left out?
+
+	while (!connections.empty())
+	{
+		//shuffle the currently remaining connections
+		//select a random element from the connections
+		std::uniform_int_distribution<> randomDistribution(0, connections.size() - 1);
+		int randomIndex = randomDistribution(gen);
+
+		auto randomElement = connections.begin();
+		std::advance(randomElement, randomIndex);
+		std::tuple<int, int, int, int> randomConnection = *randomElement;
+
+		//filter connections to only include connections that connect 2 specific regions
+		std::list<std::tuple<int, int, int, int>> filteredConnections(connections);
+		filteredConnections.remove_if([=](std::tuple<int, int, int, int> connection)
+			{
+				return std::get<2>(connection) != std::get<2>(randomConnection) ||
+					   std::get<3>(connection) != std::get<3>(randomConnection);
+			});
+
+		//create a shuffled refference wrapper of the filtered list
+		std::vector<std::reference_wrapper<const std::tuple<int, int, int, int>>> wrapper(filteredConnections.begin(), filteredConnections.end());
+		std::shuffle(wrapper.begin(), wrapper.end(), gen);
+
+		int nrOfConnections = connectionDistribution(gen);
+		int connectionsPlaced = 0;
+
+		auto iterator = wrapper.begin();
+
+		while (iterator < wrapper.begin() + wrapper.size() && connectionsPlaced < nrOfConnections)
+		{
+			//get current tile
+			std::tuple<int, int, int, int> currentConnection = *iterator;
+			std::advance(iterator, 1);
+
+			//count the nr of surrounding floor tiles
+			int surroundingFloors = 0;
+			for (int y = -1; y <= 1; y++)
+			{
+				for (int x = -1; x <= 1; x++)
+				{
+					//ignore diagonals
+					if (x == y || x == -y) continue;
+
+					if (map[(std::get<0>(currentConnection) + y) * mapWidth + (std::get<1>(currentConnection) + x)].first == '.')
+						surroundingFloors++;
+				}
+			}
+
+			if (surroundingFloors > 2) continue;
+
+			//update tile
+			map[std::get<0>(currentConnection) * mapWidth + std::get<1>(currentConnection)].first = '.';
+			map[std::get<0>(currentConnection) * mapWidth + std::get<1>(currentConnection)].second = std::get<2>(currentConnection);
+
+			connectionsPlaced++;
+		}
+
+		//take the set difference: connections \ filteredconnections
+		std::list<std::tuple<int, int, int, int>> difference;
+		std::set_difference(connections.begin(), connections.end(), filteredConnections.begin(), filteredConnections.end(), std::inserter(difference, difference.begin()));
+
+		connections.clear();
+		std::copy(difference.begin(), difference.end(), std::back_inserter(connections));
+	}
+//
+//	//while there are connections left
+//	//shuffle the list
+//	//filter all connections that have the same ids as connection 0, shuffle list
+//	//place at between 1 and 3 connections from shuffled list
+//	//check boundaries but ignore diagonals and this tile
+//	//count the surrounding floor tiles
+//	//if more than 2 floors, skip
+//	//remove from the original list the filtered list (set difference)
+//	// 
+//	//TODO: keep track of which tiles are rooms
+//	//TODO: how to distinguish between passages and rooms?
+//	//TODO: how to check when you can connect both vertically or horizontally?
+}
+
 RandomLevelGenerator::RandomLevelGenerator(int mapWidth, int mapHeight, int maxRoomWidth, int maxRoomHeight, int roomPlaceAttempts)
 	:mapWidth(mapWidth), mapHeight(mapHeight), maxRoomWidth(maxRoomWidth), maxRoomHeight(maxRoomHeight), roomPlaceAttempts(roomPlaceAttempts), rd(), gen(rd())
 {
@@ -184,6 +306,8 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 		}
 	}
 
+	int unsetId = id;
+
 	id++;
 
 	//merge rooms
@@ -195,7 +319,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	{
 		for (int x = 1; x < mapWidth - 1; x++)
 		{
-			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == -1)
+			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == unsetId)
 			{
 				std::stack<std::pair<int, int>> stack;
 				stack.emplace(std::make_pair(y, x));
@@ -246,7 +370,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 		}
 	}
 
-	//create connections
+	CreateConnections();
 
 	//trim ends
 
