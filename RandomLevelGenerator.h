@@ -10,7 +10,7 @@ class RandomLevelGenerator
 public:
 	RandomLevelGenerator(int mapWidth, int mapHeight, int maxRoomWidth, int maxRoomHeight, int roomPlaceAttempts);
 
-	void GenerateRandomLevel(std::wstring &map, int &spawnX, int &spawnY);
+	void GenerateRandomLevel(std::wstring &map, uint16_t &spawnX, uint16_t&spawnY);
 
 private:
 	enum Direction

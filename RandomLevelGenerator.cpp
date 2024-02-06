@@ -287,7 +287,7 @@ RandomLevelGenerator::RandomLevelGenerator(int mapWidth, int mapHeight, int maxR
 	map = (std::pair<char,int> *)malloc(sizeof(std::pair<char, int>) * mapWidth * mapHeight);
 }
 
-void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spawnX, int& spawnY)
+void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t& spawnX, uint16_t& spawnY)
 {
 	int id = -1;
 
@@ -308,6 +308,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 	std::uniform_int_distribution<> roomX(1, mapWidth - 1);
 	std::uniform_int_distribution<> roomY(1, mapHeight - 1);
 
+	bool playerPlaced = false;
 	id = 0;
 	for (int i = 0; i < roomPlaceAttempts; i++)
 	{
@@ -317,7 +318,13 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, int& spa
 		uint16_t roomColumn = roomX(gen);
 		uint16_t roomRow = roomY(gen);
 
-		//todo: just make this roomHeight not roomHeight * 2
+		if (!playerPlaced)
+		{
+			spawnX = roomColumn;
+			spawnY = roomRow;
+		}
+
+		//TODO: just make this roomHeight not roomHeight * 2
 		//i was fucking high when i wrote this aight
 		for (int y = -roomHeight; y <= roomHeight; y++)
 		{
