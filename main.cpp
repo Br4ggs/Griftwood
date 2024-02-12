@@ -9,6 +9,9 @@
 
 #include "RandomLevelGenerator.h"
 
+//BUGBUG: player can walk through some walls diagonally
+//		  -might be related to collision code around map bounds?
+
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
@@ -77,10 +80,10 @@ int main(int argc, char* args[])
 	}
 
 	//BUGBUG: something weird going on with this map, check spawn position
-	uint16_t spawnX = 0;
-	uint16_t spawnY = 0;
+	uint32_t spawnX = 0;
+	uint32_t spawnY = 0;
 
-	levelGenerator.GenerateRandomLevel(map, (uint16_t &)spawnX, (uint16_t &)spawnY);
+	levelGenerator.GenerateRandomLevel(map, spawnX, spawnY);
 
 	playerX = spawnX + 0.5f;
 	playerY = spawnY + 0.5f;

@@ -3,64 +3,79 @@
 #include <random>
 #include <algorithm>
 #include <iterator>
-#include <list>
 #include <stack>
 #include <tuple>
 
 //TODO: add constants for id's for walls, passageways(?) and rooms(?)
 
-void RandomLevelGenerator::GetBoundingRectangle(int &xStart, int &xEnd, int &yStart, int &yEnd, Direction dir)
+RandomLevelGenerator::BoundingRectangle RandomLevelGenerator::GetBoundingRectangle(const Direction dir) const
 {
+	BoundingRectangle rect = {};
+
 	switch (dir)
 	{
 		case Direction::Up:
-			xStart = -1;
-			xEnd   = 1;
-			yStart = -1;
-			yEnd   = 0;
+			rect.xStart = -1;
+			rect.xEnd   = 1;
+			rect.yStart = -1;
+			rect.yEnd   = 0;
 			break;
 		case Direction::Down:
-			xStart = -1;
-			xEnd   = 1;
-			yStart = 0;
-			yEnd   = 1;
+			rect.xStart = -1;
+			rect.xEnd   = 1;
+			rect.yStart = 0;
+			rect.yEnd   = 1;
 			break;
 		case Direction::Left:
-			xStart = -1;
-			xEnd   = 0;
-			yStart = -1;
-			yEnd   = 1;
+			rect.xStart = -1;
+			rect.xEnd   = 0;
+			rect.yStart = -1;
+			rect.yEnd   = 1;
 			break;
 		case Direction::Right:
-			xStart = 0;
-			xEnd   = 1;
-			yStart = -1;
-			yEnd   = 1;
+			rect.xStart = 0;
+			rect.xEnd   = 1;
+			rect.yStart = -1;
+			rect.yEnd   = 1;
 			break;
 		case Direction::Origin:
-			xStart = -1;
-			xEnd = 1;
-			yStart = -1;
-			yEnd = 1;
+			rect.xStart = -1;
+			rect.xEnd = 1;
+			rect.yStart = -1;
+			rect.yEnd = 1;
+			break;
+		case Direction::Vertical:
+			rect.xStart = 0;
+			rect.xEnd = 0;
+			rect.yStart = -1;
+			rect.yEnd = -1;
+			break;
+		case Direction::Horizontal:
+			rect.xStart = -1;
+			rect.xEnd = 1;
+			rect.yStart = 0;
+			rect.yEnd = 0;
 			break;
 		default:
-			xStart = 0;
-			xEnd = 0;
-			yStart = 0;
-			yEnd = 0;
+			rect.xStart = 0;
+			rect.xEnd = 0;
+			rect.yStart = 0;
+			rect.yEnd = 0;
+			break;
 	}
+	
+	return rect;
 }
 
-bool RandomLevelGenerator::CanPlaceTunnel(int x, int y, int xStart, int xEnd, int yStart, int yEnd)
+bool RandomLevelGenerator::CanPlaceTunnel(const uint32_t x, const uint32_t y, const BoundingRectangle rect) const
 {
-	for (int yOffset = yStart; yOffset <= yEnd; yOffset++)
+	for (int8_t yOffset = rect.yStart; yOffset <= rect.yEnd; yOffset++)
 	{
-		for (int xOffset = xStart; xOffset <= xEnd; xOffset++)
+		for (int8_t xOffset = rect.xStart; xOffset <= rect.xEnd; xOffset++)
 		{
 			if (yOffset == 0 && xOffset == 0) continue;
 
 			if (y + yOffset < 1 || y + yOffset > mapHeight - 2) continue;
-
 			if (x + xOffset < 1 || x + xOffset > mapWidth - 2) continue;
 
 			if (map[(yOffset + y) * mapWidth + (xOffset + x)].first == '.') return false;
@@ -70,149 +85,167 @@ bool RandomLevelGenerator::CanPlaceTunnel(int x, int y, int xStart, int xEnd, in
 	return true;
 }
 
-//precondition: CanPlaceTunnel(x,y) == true
-//TODO: this is sluggish as shit. see if you can maybe optimize this
-void RandomLevelGenerator::GeneratePassageWays(int xOrigin, int yOrigin, int id)
+//precondition: (x,y) is in bounds
+bool RandomLevelGenerator::CanPlaceConnection(const uint32_t x, const uint32_t y, const Direction dir) const
 {
-	std::list<std::tuple<int, int, Direction>> possiblePassageWays;
-	//turn the current tile (x,y) int a passage
-	//check the up/down/left and right adjacent walls, and if viable add them to the stack
-	//viable walls
+	bool ret;
+	switch (dir)
+	{
+	case Direction::Vertical:
+		ret = x > 0 && x < mapWidth - 1 &&
+			  y > 1 && y < mapHeight - 2 &&
+			  map[(y - 1) * mapWidth + x].first == '.' &&
+			  map[(y + 1) * mapWidth + x].first == '.' &&
+			  map[(y - 1) * mapWidth + x].second != map[(y + 1) * mapWidth + x].second;
+		break;
+	case Direction::Horizontal:
+		ret = x > 1 && x < mapWidth - 2 &&
+			  y > 0 && y < mapHeight - 1 &&
+			  map[y * mapWidth + (x - 1)].first == '.' &&
+			  map[y * mapWidth + (x + 1)].first == '.' &&
+			  map[y * mapWidth + (x - 1)].second != map[y * mapWidth + (x + 1)].second;
+		break;
+	default:
+		ret = false;
+		break;
+	}
+
+	return ret;
+}
+
+template <typename T>
+typename std::list<T>::iterator RandomLevelGenerator::GetRandomElement(std::list<T> &list)
+{
+	std::uniform_int_distribution<> randomDistribution(0, list.size() - 1);
+	int randomIndex = randomDistribution(gen);
+	auto iter = list.begin();
+	std::advance(iter, randomIndex);
+	return iter;
+}
+
+//precondition: CanPlaceTunnel(x,y) == true
+void RandomLevelGenerator::GeneratePassageWays(const uint32_t xOrigin, const uint32_t yOrigin, const int32_t id)
+{
+	//TODO: check for out of bounds
+
+	std::list<PossiblePassageWay> possiblePassageWays;
 
 	//check adjacent walls for viability, and if viable, add them as possible new passages
-	if (yOrigin - 1 > 0)				possiblePassageWays.push_back(std::make_tuple(yOrigin - 1, xOrigin, Direction::Up));
-	if (yOrigin + 1 < mapHeight - 1)	possiblePassageWays.push_back(std::make_tuple(yOrigin + 1, xOrigin, Direction::Down));
-	if (xOrigin - 1 > 0)				possiblePassageWays.push_back(std::make_tuple(yOrigin, xOrigin - 1, Direction::Left));
-	if (xOrigin + 1 > mapWidth - 1)		possiblePassageWays.push_back(std::make_tuple(yOrigin, xOrigin + 1, Direction::Right));
+	if (yOrigin > 1)				possiblePassageWays.push_back({ xOrigin, yOrigin - 1, Direction::Up    });
+	if (yOrigin < mapHeight - 2)	possiblePassageWays.push_back({ xOrigin, yOrigin + 1, Direction::Down  });
+	if (xOrigin > 1)				possiblePassageWays.push_back({ xOrigin - 1, yOrigin, Direction::Left  });
+	if (xOrigin > mapWidth - 2)		possiblePassageWays.push_back({ xOrigin + 1, yOrigin, Direction::Right });
 
 	//while viable walls exist
 	while (!possiblePassageWays.empty())
 	{
 		//take a random viable wall
-		std::uniform_int_distribution<> randomDistribution(0, possiblePassageWays.size() - 1);
-		int randomIndex = randomDistribution(gen);
-
-		auto randomElement = possiblePassageWays.begin();
-		std::advance(randomElement, randomIndex);
-
-		std::tuple<int, int, Direction> passageWay = *randomElement;
-
-		int xCurrent = std::get<1>(passageWay);
-		int yCurrent = std::get<0>(passageWay);
+		auto iter = GetRandomElement(possiblePassageWays);
+		PossiblePassageWay passageWay = *iter;
 
 		//depending on the direction of the wall, we have to check a specific rectangular area
 		//if it is valid then turn this tile into a passage, and add its 3 adjacent walls as
 		//viable passage ways
-		int xStart, xEnd, yStart, yEnd;
-		GetBoundingRectangle(xStart, xEnd, yStart, yEnd, std::get<2>(passageWay));
+		BoundingRectangle rect = GetBoundingRectangle(passageWay.direction);
 
-		if (CanPlaceTunnel(xCurrent, yCurrent, xStart, xEnd, yStart, yEnd))
+		if (CanPlaceTunnel(passageWay.x, passageWay.y, rect))
 		{
-			map[yCurrent * mapWidth + xCurrent].first = '.';
-			map[yCurrent * mapWidth + xCurrent].second = id;
+			map[passageWay.y * mapWidth + passageWay.x].first = '.';
+			map[passageWay.y * mapWidth + passageWay.x].second = id;
 
 			//add corresponding adjacent walls
-			if (yStart != 0 && yCurrent + yStart > 0)
-				possiblePassageWays.push_back(std::make_tuple(yCurrent + yStart, xCurrent, Direction::Up));
+			if (rect.yStart != 0 && passageWay.y + rect.yStart > 0)
+				possiblePassageWays.push_back({ passageWay.x, passageWay.y + rect.yStart, Direction::Up });
 
-			if (yEnd != 0 && yCurrent + yEnd < mapHeight - 1)
-				possiblePassageWays.push_back(std::make_tuple(yCurrent + yEnd, xCurrent, Direction::Down));
+			if (rect.yEnd != 0 && passageWay.y + rect.yEnd < mapHeight - 1)
+				possiblePassageWays.push_back({ passageWay.x, passageWay.y + rect.yEnd, Direction::Down });
 
-			if (xStart != 0 && xCurrent + xStart > 0)
-				possiblePassageWays.push_back(std::make_tuple(yCurrent, xCurrent + xStart, Direction::Left));
+			if (rect.xStart != 0 && passageWay.x + rect.xStart > 0)
+				possiblePassageWays.push_back({ passageWay.x + rect.xStart, passageWay.y, Direction::Left });
 
-			if (xEnd != 0 && xCurrent + xEnd < mapWidth - 1)
-				possiblePassageWays.push_back(std::make_tuple(yCurrent, xCurrent + xEnd, Direction::Right));
+			if (rect.xEnd != 0 && passageWay.x + rect.xEnd < mapWidth - 1)
+				possiblePassageWays.push_back({ passageWay.x + rect.xEnd, passageWay.y, Direction::Right });
 		}
 
 		//remove the element from the list
-		possiblePassageWays.erase(randomElement);
+		possiblePassageWays.erase(iter);
 	}
 }
 
+
+//TODO: make this a bit clearer...
 void RandomLevelGenerator::CreateConnections()
 {
-	//create connections
-	//shits ridiculous
-	//y-coordinate, x-coordinate, first region id, second region id
-	std::list<std::tuple<int, int, int, int>> connections;
+	//create a list of all possible connections
+	std::list<PossibleConnection> connections;
 
-	for (int y = 1; y < mapHeight - 1; y++)
+	for (uint32_t y = 1; y < mapHeight - 1; y++)
 	{
-		for (int x = 1; x < mapWidth - 1; x++)
+		for (uint32_t x = 1; x < mapWidth - 1; x++)
 		{
 			if (map[y * mapWidth + x].first == '.') continue;
 
 			//wall vertically connects 2 spaces
-			if (map[(y - 1) * mapWidth + x].first == '.' &&
-				map[(y + 1) * mapWidth + x].first == '.' &&
-				map[(y - 1) * mapWidth + x].second != map[(y + 1) * mapWidth + x].second)
+			if (CanPlaceConnection(x, y, Direction::Vertical))
 			{
 				//store in list with coordinates, and 2 region id's?
-				int firstId = std::min(map[(y - 1) * mapWidth + x].second, map[(y + 1) * mapWidth + x].second);
-				int secondId = std::max(map[(y - 1) * mapWidth + x].second, map[(y + 1) * mapWidth + x].second);
-				connections.push_back(std::make_tuple(y, x, firstId, secondId));
+				int32_t firstId = std::min(map[(y - 1) * mapWidth + x].second, map[(y + 1) * mapWidth + x].second);
+				int32_t secondId = std::max(map[(y - 1) * mapWidth + x].second, map[(y + 1) * mapWidth + x].second);
+				connections.push_back({ x, y, firstId, secondId });
 			}
 
 			//wall horizontally connects 2 spaces
-			else if (map[y * mapWidth + (x - 1)].first == '.' &&
-				map[y * mapWidth + (x + 1)].first == '.' &&
-				map[y * mapWidth + (x - 1)].second != map[y * mapWidth + (x + 1)].second)
+			else if (CanPlaceConnection(x, y, Direction::Horizontal))
 			{
 				//store in list with coordinates, and 2 region id's?
-				int firstId = std::min(map[y * mapWidth + (x - 1)].second, map[y * mapWidth + (x + 1)].second);
-				int secondId = std::max(map[y * mapWidth + (x - 1)].second, map[y * mapWidth + (x + 1)].second);
-				connections.push_back(std::make_tuple(y, x, firstId, secondId));
+				int32_t firstId = std::min(map[y * mapWidth + (x - 1)].second, map[y * mapWidth + (x + 1)].second);
+				int32_t secondId = std::max(map[y * mapWidth + (x - 1)].second, map[y * mapWidth + (x + 1)].second);
+				connections.push_back({ x, y, firstId, secondId });
 			}
 		}
 	}
 
 	std::uniform_int_distribution<> connectionDistribution(1, 4); //parameterize this
 
+	//iterate over all possible connections
 	while (!connections.empty())
 	{
-		//shuffle the currently remaining connections
 		//select a random element from the connections
-		std::uniform_int_distribution<> randomDistribution(0, connections.size() - 1);
-		int randomIndex = randomDistribution(gen);
-
-		auto randomElement = connections.begin();
-		std::advance(randomElement, randomIndex);
-		std::tuple<int, int, int, int> randomConnection = *randomElement;
+		auto iter = GetRandomElement(connections);
+		PossibleConnection randomConnection = *iter;
 
 		//filter connections to only include connections that connect 2 specific regions
-		std::list<std::tuple<int, int, int, int>> filteredConnections(connections);
-		filteredConnections.remove_if([=](std::tuple<int, int, int, int> connection)
+		std::list<PossibleConnection> filteredConnections(connections);
+		filteredConnections.remove_if([=](PossibleConnection connection)
 			{
-				return std::get<2>(connection) != std::get<2>(randomConnection) ||
-					   std::get<3>(connection) != std::get<3>(randomConnection);
+				return connection.id1 != randomConnection.id1 ||
+					   connection.id2 != randomConnection.id2;
 			});
 
 		//create a shuffled refference wrapper of the filtered list
-		std::vector<std::reference_wrapper<const std::tuple<int, int, int, int>>> wrapper(filteredConnections.begin(), filteredConnections.end());
+		std::vector<std::reference_wrapper<PossibleConnection>> wrapper(filteredConnections.begin(), filteredConnections.end());
 		std::shuffle(wrapper.begin(), wrapper.end(), gen);
 
 		int nrOfConnections = connectionDistribution(gen);
 		int connectionsPlaced = 0;
 
 		auto iterator = wrapper.begin();
-
 		while (iterator < wrapper.begin() + wrapper.size() && connectionsPlaced < nrOfConnections)
 		{
 			//get current tile
-			std::tuple<int, int, int, int> currentConnection = *iterator;
+			PossibleConnection currentConnection = *iterator;
 			std::advance(iterator, 1);
 
 			//count the nr of surrounding floor tiles
-			int surroundingFloors = 0;
-			for (int y = -1; y <= 1; y++)
+			uint8_t surroundingFloors = 0;
+			for (int8_t y = -1; y <= 1; y++)
 			{
-				for (int x = -1; x <= 1; x++)
+				for (int8_t x = -1; x <= 1; x++)
 				{
 					//ignore diagonals
 					if (x == y || x == -y) continue;
 
-					if (map[(std::get<0>(currentConnection) + y) * mapWidth + (std::get<1>(currentConnection) + x)].first == '.')
+					if (map[(currentConnection.y + y) * mapWidth + (currentConnection.x + x)].first == '.')
 						surroundingFloors++;
 				}
 			}
@@ -220,42 +253,42 @@ void RandomLevelGenerator::CreateConnections()
 			if (surroundingFloors > 2) continue;
 
 			//update tile
-			map[std::get<0>(currentConnection) * mapWidth + std::get<1>(currentConnection)].first = '.';
-			map[std::get<0>(currentConnection) * mapWidth + std::get<1>(currentConnection)].second = std::get<2>(currentConnection);
+			map[currentConnection.y * mapWidth + currentConnection.x].first = '.';
+			map[currentConnection.y * mapWidth + currentConnection.x].second = currentConnection.id1;
 
 			connectionsPlaced++;
 		}
 
 		//take the set difference: connections \ filteredconnections
-		std::list<std::tuple<int, int, int, int>> difference;
-		std::set_difference(connections.begin(), connections.end(), filteredConnections.begin(), filteredConnections.end(), std::inserter(difference, difference.begin()));
+		std::list<PossibleConnection> difference;
+		std::set_difference(connections.begin(), connections.end(), filteredConnections.begin(), filteredConnections.end(), std::back_inserter(difference));
 
 		connections.clear();
 		std::copy(difference.begin(), difference.end(), std::back_inserter(connections));
 	}
 }
 
-void RandomLevelGenerator::TrimEnds(const int iterations)
+void RandomLevelGenerator::TrimEnds(const uint8_t iterations)
 {
 	//(y,x)
-	std::list<std::pair<int, int>> newWalls;
+	std::list<std::pair<uint32_t, uint32_t>> newWalls;
 
-	for (int i = 0; i < iterations; i++)
+	for (uint8_t i = 0; i < iterations; i++)
 	{
 		newWalls.clear();
 
-		for (int y = 0; y < mapHeight - 1; y++)
+		for (uint32_t y = 0; y < mapHeight - 1; y++)
 		{
-			for (int x = 0; x < mapWidth - 1; x++)
+			for (uint32_t x = 0; x < mapWidth - 1; x++)
 			{
 				if (map[y * mapWidth + x].first == '#') continue;
 
-				int walls = 0;
+				uint8_t walls = 0;
 
 				//this pattern appears quite often, maybe create a utility function for this that can evaluate lambdas?
-				for (int yOffset = -1; yOffset <= 1; yOffset++)
+				for (int8_t yOffset = -1; yOffset <= 1; yOffset++)
 				{
-					for (int xOffset = -1; xOffset <= 1; xOffset++)
+					for (int8_t xOffset = -1; xOffset <= 1; xOffset++)
 					{
 						if (yOffset == xOffset || yOffset == -xOffset) continue;
 
@@ -273,7 +306,7 @@ void RandomLevelGenerator::TrimEnds(const int iterations)
 			}
 		}
 
-		std::for_each(newWalls.begin(), newWalls.end(), [=](std::pair<int, int> elem)
+		std::for_each(newWalls.begin(), newWalls.end(), [=](std::pair<uint32_t, uint32_t> elem)
 			{
 				map[elem.first * mapWidth + elem.second].first = '#';
 				map[elem.first * mapWidth + elem.second].second = -1;
@@ -281,24 +314,33 @@ void RandomLevelGenerator::TrimEnds(const int iterations)
 	}
 }
 
-RandomLevelGenerator::RandomLevelGenerator(int mapWidth, int mapHeight, int maxRoomWidth, int maxRoomHeight, int roomPlaceAttempts)
+RandomLevelGenerator::RandomLevelGenerator(uint32_t mapWidth, uint32_t mapHeight, uint16_t maxRoomWidth, uint16_t maxRoomHeight, uint8_t roomPlaceAttempts)
 	:mapWidth(mapWidth), mapHeight(mapHeight), maxRoomWidth(maxRoomWidth), maxRoomHeight(maxRoomHeight), roomPlaceAttempts(roomPlaceAttempts), rd(), gen(rd())
 {
 	map = (std::pair<char,int> *)malloc(sizeof(std::pair<char, int>) * mapWidth * mapHeight);
 }
 
-void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t& spawnX, uint16_t& spawnY)
+RandomLevelGenerator::~RandomLevelGenerator()
 {
-	int id = -1;
+	free(map);
+	map = nullptr;
+}
+
+//TODO: cleanup
+void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t& spawnX, uint32_t& spawnY)
+{
+	int32_t id = -1;
 
 	//clear map buffer
-	for (int y = 0; y < mapHeight; y++)
+	for (uint32_t y = 0; y < mapHeight; y++)
 	{
-		for (int x = 0; x < mapWidth; x++)
+		for (uint32_t x = 0; x < mapWidth; x++)
 		{
 			map[y * mapWidth + x] = std::make_pair('#', id);
 		}
 	}
+
+	//TODO: turn placeRooms and Mergerooms routines into a separate method
 
 	//place rooms randomly
 	std::uniform_int_distribution<> roomHeightDistr(1, maxRoomHeight);
@@ -310,10 +352,10 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 
 	bool playerPlaced = false;
 	id = 0;
-	for (int i = 0; i < roomPlaceAttempts; i++)
+	for (uint8_t i = 0; i < roomPlaceAttempts; i++)
 	{
-		int roomHeight = roomHeightDistr(gen);
-		int roomWidth = roomWidthDistr(gen);
+		uint16_t roomHeight = roomHeightDistr(gen);
+		uint16_t roomWidth = roomWidthDistr(gen);
 
 		uint16_t roomColumn = roomX(gen);
 		uint16_t roomRow = roomY(gen);
@@ -345,7 +387,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 		}
 	}
 
-	int unsetId = id;
+	int32_t unsetId = id;
 	id++;
 
 	//merge rooms
@@ -390,10 +432,9 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 	{
 		for (int x = 1; x < mapWidth - 1; x++)
 		{
-			int xStart, xEnd, yStart, yEnd;
-			GetBoundingRectangle(xStart, xEnd, yStart, yEnd, Direction::Origin);
+			BoundingRectangle rect = GetBoundingRectangle(Direction::Origin);
 
-			if (map[y * mapWidth + x].first == '#' && CanPlaceTunnel(x, y, xStart, xEnd, yStart, yEnd))
+			if (map[y * mapWidth + x].first == '#' && CanPlaceTunnel(x, y, rect))
 			{
 				//generate passage ways
 				GeneratePassageWays(x, y, id);
@@ -407,9 +448,7 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint16_t
 	//trim ends
 	TrimEnds(15);
 
-	//remove unnecessary walls
-
-	//map[spawnY * mapWidth + spawnX].first = '@';
+	//remove unnecessary walls?
 	
 	stringMap.clear();
 
