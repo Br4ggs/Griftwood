@@ -347,18 +347,18 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t
 	std::uniform_int_distribution<> roomWidthDistr(1, maxRoomWidth);
 
 	//hopefully x and y are not swapped lol
-	std::uniform_int_distribution<> roomX(1, mapWidth - 1);
-	std::uniform_int_distribution<> roomY(1, mapHeight - 1);
+	std::uniform_int_distribution<uint32_t> roomX(1, mapWidth - 1);
+	std::uniform_int_distribution<uint32_t> roomY(1, mapHeight - 1);
 
 	bool playerPlaced = false;
 	id = 0;
 	for (uint8_t i = 0; i < roomPlaceAttempts; i++)
 	{
-		uint16_t roomHeight = roomHeightDistr(gen);
-		uint16_t roomWidth = roomWidthDistr(gen);
+		int roomHeight = roomHeightDistr(gen);
+		int roomWidth = roomWidthDistr(gen);
 
-		uint16_t roomColumn = roomX(gen);
-		uint16_t roomRow = roomY(gen);
+		uint32_t roomColumn = roomX(gen);
+		uint32_t roomRow = roomY(gen);
 
 		//TODO: just make this roomHeight not roomHeight * 2
 		//i was fucking high when i wrote this aight
@@ -391,18 +391,18 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t
 	id++;
 
 	//merge rooms
-	for (int y = 1; y < mapHeight - 1; y++)
+	for (uint32_t y = 1; y < mapHeight - 1; y++)
 	{
-		for (int x = 1; x < mapWidth - 1; x++)
+		for (uint32_t x = 1; x < mapWidth - 1; x++)
 		{
 			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == unsetId)
 			{
-				std::stack<std::pair<int, int>> stack;
+				std::stack<std::pair<uint32_t, uint32_t>> stack;
 				stack.emplace(std::make_pair(y, x));
 
 				while (!stack.empty())
 				{
-					std::pair<int, int> currentTile = stack.top();
+					std::pair<uint32_t, uint32_t> currentTile = stack.top();
 					stack.pop();
 
 					if (map[currentTile.first * mapWidth + currentTile.second].second != unsetId) continue;
@@ -428,9 +428,9 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t
 	}
 
 	//floodfill
-	for (int y = 1; y < mapHeight - 1; y++)
+	for (uint32_t y = 1; y < mapHeight - 1; y++)
 	{
-		for (int x = 1; x < mapWidth - 1; x++)
+		for (uint32_t x = 1; x < mapWidth - 1; x++)
 		{
 			BoundingRectangle rect = GetBoundingRectangle(Direction::Origin);
 
@@ -449,16 +449,18 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t
 	TrimEnds(15);
 
 	//remove unnecessary walls?
+
+	map[spawnY * mapWidth + spawnX].first = '$';
 	
 	stringMap.clear();
 
-	for (int y = 0; y < mapHeight; y++)
+	for (uint32_t y = 0; y < mapHeight; y++)
 	{
-		for (int x = 0; x < mapWidth; x++)
+		for (uint32_t x = 0; x < mapWidth; x++)
 		{
 			stringMap += map[y * mapWidth + x].first;
 		}
 
-		stringMap += L"\n";
+		//stringMap += L"\n";
 	}
 }

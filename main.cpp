@@ -1,8 +1,10 @@
 #include <stdio.h>
+#include <iostream>
 #include <string>
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <bit>
 
 #include <SDL.h>
 #include <SDL_image.h>
@@ -11,14 +13,19 @@
 
 //BUGBUG: player can walk through some walls diagonally
 //		  -might be related to collision code around map bounds?
+//BUGBUG: player still sometimes spawns in walls? probably a casting bug
+
+//TODO: rendered world is mirrored in x-axis, but this shouldn't be an immediate problem
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
 //Game constants
-const int mapHeight = 16;
-const int mapWidth = 16;
+//const int mapHeight = 16;
+//const int mapWidth = 16;
+const uint32_t mapHeight = 40;
+const uint32_t mapWidth = 40;
 
 const float FOV = 3.14159 / 4.0;
 const float maxDepth = 12.0f;
@@ -31,7 +38,7 @@ float playerX = 8.5f;
 float playerY = 7.5f;
 float playerA = 0.0f;
 
-RandomLevelGenerator levelGenerator(40, 40, 5, 5, 25);
+RandomLevelGenerator levelGenerator(mapWidth, mapHeight, 5, 5, 25);
 
 std::wstring map;
 
@@ -70,6 +77,25 @@ void sortSprites(std::vector<int>& order, std::vector<float>& distance, int coun
 
 void render();
 
+//preliminary check to ensure player never goes out of bounds of array, also ensures x stays in range
+bool OutOfBounds(float playerX, float playerY)
+{
+	return playerX < 1 || playerX > mapWidth - 1 || playerY < 1 || playerY > mapHeight - 1;
+}
+
+void PrintMap(std::wstring map, uint32_t mapWidth, uint32_t mapHeight)
+{
+	for (uint32_t y = 0; y < mapHeight; y++)
+	{
+		std::wcout << map.substr((uint64_t)y * mapWidth, mapWidth) << std::endl;
+	}
+}
+
+void ProcessInput()
+{
+	//TODO
+}
+
 //drawing each pixel individually is super slow
 int main(int argc, char* args[])
 {
@@ -80,13 +106,18 @@ int main(int argc, char* args[])
 	}
 
 	//BUGBUG: something weird going on with this map, check spawn position
-	uint32_t spawnX = 0;
-	uint32_t spawnY = 0;
+	uint32_t spawnX = 8;
+	uint32_t spawnY = 7;
 
 	levelGenerator.GenerateRandomLevel(map, spawnX, spawnY);
 
-	playerX = spawnX + 0.5f;
-	playerY = spawnY + 0.5f;
+
+	//somehow we're still spawning in walls
+	//we might have misaligned the generator coordinates with the rendering coordinates
+	playerX = static_cast<float>(spawnX) + 0.5f;
+	playerY = static_cast<float>(spawnY) + 0.5f;
+	//playerX = spawnX + 0.5f;
+	//playerY = spawnY + 0.5f;
 
 	//create map
 	//map += L"################";
@@ -95,12 +126,12 @@ int main(int argc, char* args[])
 	//map += L"#.#............#";
 	//map += L"#..............#";
 	//map += L"#..............#";
-	//map += L"#......#.#......";
-	//map += L"#...............";
-	//map += L"#......#.#......";
+	//map += L"#......#.#.....#";
+	//map += L"#..............#";
+	//map += L"#......#.#.....#";
 	//map += L"#..............#";
 	//map += L"#..............#";
-	//map += L"#..............#";
+	//map += L"#..........#...#";
 	//map += L"#...........####";
 	//map += L"#..............#";
 	//map += L"#..............#";
@@ -117,6 +148,9 @@ int main(int argc, char* args[])
 		{10.0, 14.0, barrelSprite},
 		{9.0, 14.0, barrelSprite}
 	};
+
+	PrintMap(map, mapWidth, mapHeight);
+	std::printf("X: %f Y: %f\n", playerX, playerY);
 
 	bool quit = false;
 	SDL_Event e;
@@ -155,7 +189,8 @@ int main(int argc, char* args[])
 			playerX += sinf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
 			playerY += cosf(playerA) * walkSpeed * deltaTime;
 
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			if (OutOfBounds(playerX, playerY) ||
+				map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
 			{
 				playerX -= sinf(playerA) * walkSpeed * deltaTime;
 				playerY -= cosf(playerA) * walkSpeed * deltaTime;
@@ -166,7 +201,8 @@ int main(int argc, char* args[])
 			playerX -= sinf(playerA) * walkSpeed * deltaTime;
 			playerY -= cosf(playerA) * walkSpeed * deltaTime;
 
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			if (OutOfBounds(playerX, playerY) ||
+				map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
 			{
 				playerX += sinf(playerA) * walkSpeed * deltaTime;
 				playerY += cosf(playerA) * walkSpeed * deltaTime;
@@ -179,7 +215,8 @@ int main(int argc, char* args[])
 			playerX += cosf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
 			playerY -= sinf(playerA) * walkSpeed * deltaTime;
 
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			if (OutOfBounds(playerX, playerY) || 
+				map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
 			{
 				playerX -= cosf(playerA) * walkSpeed * deltaTime;
 				playerY += sinf(playerA) * walkSpeed * deltaTime;
@@ -190,7 +227,8 @@ int main(int argc, char* args[])
 			playerX -= cosf(playerA) * walkSpeed * deltaTime;
 			playerY += sinf(playerA) * walkSpeed * deltaTime;
 
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
+			if (OutOfBounds(playerX, playerY) || 
+				map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
 			{
 				playerX += cosf(playerA) * walkSpeed * deltaTime;
 				playerY -= sinf(playerA) * walkSpeed * deltaTime;
@@ -358,47 +396,47 @@ void render()
 
 	//render the ceiling and floor
 	//TODO: research and improve
-	for (int y = SCREEN_HEIGHT - 1; y >= SCREEN_HEIGHT * 0.5f; y--)
-	{	
-		//2 vectors for leftmost and rightmost ray
-		float vector1X = dirX - perpX;
-		float vector1Y = dirY - perpY;
-		float vector2X = dirX + perpX;
-		float vector2Y = dirY + perpY;
+	//for (int y = SCREEN_HEIGHT - 1; y >= SCREEN_HEIGHT * 0.5f; y--)
+	//{	
+	//	//2 vectors for leftmost and rightmost ray
+	//	float vector1X = dirX - perpX;
+	//	float vector1Y = dirY - perpY;
+	//	float vector2X = dirX + perpX;
+	//	float vector2Y = dirY + perpY;
 
-		//the current y-position, relative to the center of the screen (the horizon)
-		int p = y - SCREEN_HEIGHT * 0.5f;
+	//	//the current y-position, relative to the center of the screen (the horizon)
+	//	int p = y - SCREEN_HEIGHT * 0.5f;
 
-		//horizontal distance from the camera to the floor for the current row?
-		float rowDistance = posZ / p;
+	//	//horizontal distance from the camera to the floor for the current row?
+	//	float rowDistance = posZ / p;
 
-		float floorStepX = rowDistance * (vector2X - vector1X) / (float)SCREEN_WIDTH;
-		float floorStepY = rowDistance * (vector2Y - vector1Y) / (float)SCREEN_WIDTH;
+	//	float floorStepX = rowDistance * (vector2X - vector1X) / (float)SCREEN_WIDTH;
+	//	float floorStepY = rowDistance * (vector2Y - vector1Y) / (float)SCREEN_WIDTH;
 
-		//coordinates in world-space of leftmost column, which we will update
-		float floorX = playerX + rowDistance * vector1X;
-		float floorY = playerY + rowDistance * vector1Y;
+	//	//coordinates in world-space of leftmost column, which we will update
+	//	float floorX = playerX + rowDistance * vector1X;
+	//	float floorY = playerY + rowDistance * vector1Y;
 
-		for (int x = 0; x < SCREEN_WIDTH; x++)
-		{
-			//texture coordinates, mask with (texHeight - 1) in case of overflow?
-			int texX = (int)(floorTexture->w * (floorX - std::floor(floorX))) & (floorTexture->h - 1);
-			int texY = (int)(floorTexture->h * (floorY - std::floor(floorY))) & (floorTexture->h - 1);
-			Uint32* spritePixels = (Uint32*)floorTexture->pixels;
-			Uint32 pixel = spritePixels[(texY * floorTexture->w) + texX];
-			set_pixel(screen, x, y, pixel);
+	//	for (int x = 0; x < SCREEN_WIDTH; x++)
+	//	{
+	//		//texture coordinates, mask with (texHeight - 1) in case of overflow?
+	//		int texX = (int)(floorTexture->w * (floorX - std::floor(floorX))) & (floorTexture->h - 1);
+	//		int texY = (int)(floorTexture->h * (floorY - std::floor(floorY))) & (floorTexture->h - 1);
+	//		Uint32* spritePixels = (Uint32*)floorTexture->pixels;
+	//		Uint32 pixel = spritePixels[(texY * floorTexture->w) + texX];
+	//		set_pixel(screen, x, y, pixel);
 
-			texX = (int)(ceilingTexture->w * (floorX - std::floor(floorX))) & (ceilingTexture->h - 1);
-			texY = (int)(ceilingTexture->h * (floorY - std::floor(floorY))) & (ceilingTexture->h - 1);
-			spritePixels = (Uint32*)ceilingTexture->pixels;
-			pixel = spritePixels[(texY * ceilingTexture->w) + texX];
-			pixel = (pixel >> 1) & 8355711; // make a bit darker;
-			set_pixel(screen, x, SCREEN_HEIGHT - y - 1, pixel);
+	//		texX = (int)(ceilingTexture->w * (floorX - std::floor(floorX))) & (ceilingTexture->h - 1);
+	//		texY = (int)(ceilingTexture->h * (floorY - std::floor(floorY))) & (ceilingTexture->h - 1);
+	//		spritePixels = (Uint32*)ceilingTexture->pixels;
+	//		pixel = spritePixels[(texY * ceilingTexture->w) + texX];
+	//		pixel = (pixel >> 1) & 8355711; // make a bit darker;
+	//		set_pixel(screen, x, SCREEN_HEIGHT - y - 1, pixel);
 
-			floorX += floorStepX;
-			floorY += floorStepY;
-		}
-	}
+	//		floorX += floorStepX;
+	//		floorY += floorStepY;
+	//	}
+	//}
 
 	//render the walls
 	for (int x = 0; x < SCREEN_WIDTH; x++)
@@ -569,80 +607,80 @@ void render()
 
 	//render objects
 	//sort objects by distance
-	std::vector<int> objectOrder;
-	std::vector<float> objectDistance;
+	//std::vector<int> objectOrder;
+	//std::vector<float> objectDistance;
 
-	for (int i = 0; i < objects.size(); i++)
-	{
-		objectOrder.push_back(i);
-		//application of pythagoras theorem, we do not need the square root to sort using distances
-		objectDistance.push_back((playerX - objects[i].x) * (playerX - objects[i].x) + (playerY - objects[i].y) * (playerY - objects[i].y));
-	}
+	//for (int i = 0; i < objects.size(); i++)
+	//{
+	//	objectOrder.push_back(i);
+	//	//application of pythagoras theorem, we do not need the square root to sort using distances
+	//	objectDistance.push_back((playerX - objects[i].x) * (playerX - objects[i].x) + (playerY - objects[i].y) * (playerY - objects[i].y));
+	//}
 
-	sortSprites(objectOrder, objectDistance, objects.size());
+	//sortSprites(objectOrder, objectDistance, objects.size());
 
-	for (int i = 0; i < objects.size(); i++)
-	{
-		Object* object = &objects[objectOrder[i]];
+	//for (int i = 0; i < objects.size(); i++)
+	//{
+	//	Object* object = &objects[objectOrder[i]];
 
-		//object position relative to player
-		float objectX = object->x - playerX;
-		float objectY = object->y - playerY;
+	//	//object position relative to player
+	//	float objectX = object->x - playerX;
+	//	float objectY = object->y - playerY;
 
-		//calculate determinant using camera matrix
-		// [ perpX dirX ] -1                                       [ dirY   -dirX ]
-		// [            ]       =  1/(perpX*dirY-dirX*perpY) *     [              ]
-		// [ perpY dirY ]                                          [ -perpY perpX ]
+	//	//calculate determinant using camera matrix
+	//	// [ perpX dirX ] -1                                       [ dirY   -dirX ]
+	//	// [            ]       =  1/(perpX*dirY-dirX*perpY) *     [              ]
+	//	// [ perpY dirY ]                                          [ -perpY perpX ]
 
-		float invDeterminant = 1 / (perpX * dirY - dirX * perpY);
+	//	float invDeterminant = 1 / (perpX * dirY - dirX * perpY);
 
-		//see above matrix for second term?
-		float transformX = invDeterminant * (dirY * objectX - dirX * objectY);
-		float transformY = invDeterminant * (-perpY * objectX + perpX * objectY);
+	//	//see above matrix for second term?
+	//	float transformX = invDeterminant * (dirY * objectX - dirX * objectY);
+	//	float transformY = invDeterminant * (-perpY * objectX + perpX * objectY);
 
-		//?
-		int spriteScreenX = int((SCREEN_WIDTH * 0.5f) * (1 + transformX / transformY));
+	//	//?
+	//	int spriteScreenX = int((SCREEN_WIDTH * 0.5f) * (1 + transformX / transformY));
 
-		//calculate height of the sprite on screen
-		//using transformY instead of real distance prevents fisheye?
-		int spriteHeight = abs(int(SCREEN_HEIGHT / transformY));
-		int drawStartY = (-spriteHeight + SCREEN_HEIGHT) * 0.5f;
-		if (drawStartY < 0) drawStartY = 0;
-		int drawEndY = (spriteHeight + SCREEN_HEIGHT) * 0.5f;
-		if (drawEndY >= SCREEN_HEIGHT) drawEndY = SCREEN_HEIGHT - 1;
+	//	//calculate height of the sprite on screen
+	//	//using transformY instead of real distance prevents fisheye?
+	//	int spriteHeight = abs(int(SCREEN_HEIGHT / transformY));
+	//	int drawStartY = (-spriteHeight + SCREEN_HEIGHT) * 0.5f;
+	//	if (drawStartY < 0) drawStartY = 0;
+	//	int drawEndY = (spriteHeight + SCREEN_HEIGHT) * 0.5f;
+	//	if (drawEndY >= SCREEN_HEIGHT) drawEndY = SCREEN_HEIGHT - 1;
 
-		//object aspect ratio
-		float objectAspectRatio = (float)object->sprite->w / (float)object->sprite->h;
+	//	//object aspect ratio
+	//	float objectAspectRatio = (float)object->sprite->w / (float)object->sprite->h;
 
-		//calculate width of sprite on screen
-		int spriteWidth = spriteHeight * objectAspectRatio;
-		int drawStartX = -spriteWidth * 0.5f + spriteScreenX;
-		if (drawStartX < 0) drawStartX = 0;
-		int drawEndX = spriteWidth * 0.5f + spriteScreenX;
-		if (drawEndX >= SCREEN_WIDTH) drawEndX = SCREEN_WIDTH - 1;
+	//	//calculate width of sprite on screen
+	//	int spriteWidth = spriteHeight * objectAspectRatio;
+	//	int drawStartX = -spriteWidth * 0.5f + spriteScreenX;
+	//	if (drawStartX < 0) drawStartX = 0;
+	//	int drawEndX = spriteWidth * 0.5f + spriteScreenX;
+	//	if (drawEndX >= SCREEN_WIDTH) drawEndX = SCREEN_WIDTH - 1;
 
-		for (int x = drawStartX; x < drawEndX; x++)
-		{
-			int texX = int(256 * (x - (-spriteWidth * 0.5f + spriteScreenX)) * object->sprite->w / spriteWidth) / 256;
+	//	for (int x = drawStartX; x < drawEndX; x++)
+	//	{
+	//		int texX = int(256 * (x - (-spriteWidth * 0.5f + spriteScreenX)) * object->sprite->w / spriteWidth) / 256;
 
-			if (transformY > 0 && x > 0 && x < SCREEN_WIDTH && transformY < zBuffer[x])
-			{
-				for (int y = drawStartY; y < drawEndY; y++)
-				{
-					int d = y * 256 - SCREEN_HEIGHT * 128 + spriteHeight * 128;
-					int texY = ((d * object->sprite->h) / spriteHeight) / 256;
+	//		if (transformY > 0 && x > 0 && x < SCREEN_WIDTH && transformY < zBuffer[x])
+	//		{
+	//			for (int y = drawStartY; y < drawEndY; y++)
+	//			{
+	//				int d = y * 256 - SCREEN_HEIGHT * 128 + spriteHeight * 128;
+	//				int texY = ((d * object->sprite->h) / spriteHeight) / 256;
 
-					//look up texture using texX and texY
-					Uint32* spritePixels = (Uint32*)object->sprite->pixels;
-					Uint32 pixel = spritePixels[(texY * object->sprite->w) + texX];
+	//				//look up texture using texX and texY
+	//				Uint32* spritePixels = (Uint32*)object->sprite->pixels;
+	//				Uint32 pixel = spritePixels[(texY * object->sprite->w) + texX];
 
-					//if pixel is not black (transparent color) then draw it
-					if ((pixel & 0x00FFFFFF) != 0)
-					{
-						set_pixel(screen, x, y, pixel);
-					}
-				}
-			}
-		}
-	}
+	//				//if pixel is not black (transparent color) then draw it
+	//				if ((pixel & 0x00FFFFFF) != 0)
+	//				{
+	//					set_pixel(screen, x, y, pixel);
+	//				}
+	//			}
+	//		}
+	//	}
+	//}
 }
