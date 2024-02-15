@@ -123,6 +123,94 @@ typename std::list<T>::iterator RandomLevelGenerator::GetRandomElement(std::list
 	return iter;
 }
 
+void RandomLevelGenerator::GenerateRooms(uint32_t& spawnX, uint32_t& spawnY, int32_t &id)
+{
+	//place rooms randomly
+	std::uniform_int_distribution<> roomHeightDistr(1, maxRoomHeight);
+	std::uniform_int_distribution<> roomWidthDistr(1, maxRoomWidth);
+
+	//hopefully x and y are not swapped lol
+	std::uniform_int_distribution<uint32_t> roomX(1, mapWidth - 1);
+	std::uniform_int_distribution<uint32_t> roomY(1, mapHeight - 1);
+
+	bool playerPlaced = false;
+	id = 0;
+	for (uint8_t i = 0; i < roomPlaceAttempts; i++)
+	{
+		int roomHeight = roomHeightDistr(gen);
+		int roomWidth = roomWidthDistr(gen);
+
+		uint32_t roomColumn = roomX(gen);
+		uint32_t roomRow = roomY(gen);
+
+		//TODO: just make this roomHeight not roomHeight * 2
+		//i was fucking high when i wrote this aight
+		for (int y = -roomHeight; y <= roomHeight; y++)
+		{
+			int yOffset = y + roomRow;
+
+			if (yOffset < 1 || yOffset >= mapHeight - 1) continue;
+
+			for (int x = -roomWidth; x <= roomWidth; x++)
+			{
+				int xOffset = x + roomColumn;
+
+				if (xOffset < 1 || xOffset >= mapWidth - 1) continue;
+
+				map[yOffset * mapWidth + xOffset].first = '.';
+				map[yOffset * mapWidth + xOffset].second = id;
+			}
+		}
+
+		if (!playerPlaced)
+		{
+			spawnX = roomColumn;
+			spawnY = roomRow;
+			playerPlaced = true;
+		}
+	}
+
+	int32_t unsetId = id;
+	id++;
+
+	//merge rooms
+	for (uint32_t y = 1; y < mapHeight - 1; y++)
+	{
+		for (uint32_t x = 1; x < mapWidth - 1; x++)
+		{
+			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == unsetId)
+			{
+				std::stack<std::pair<uint32_t, uint32_t>> stack;
+				stack.emplace(std::make_pair(y, x));
+
+				while (!stack.empty())
+				{
+					std::pair<uint32_t, uint32_t> currentTile = stack.top();
+					stack.pop();
+
+					if (map[currentTile.first * mapWidth + currentTile.second].second != unsetId) continue;
+
+					map[currentTile.first * mapWidth + currentTile.second].second = id;
+
+					if (map[(currentTile.first - 1) * mapWidth + currentTile.second].first == '.') //up
+						stack.emplace(std::make_pair(currentTile.first - 1, currentTile.second));
+
+					if (map[(currentTile.first + 1) * mapWidth + currentTile.second].first == '.') //down
+						stack.emplace(std::make_pair(currentTile.first + 1, currentTile.second));
+
+					if (map[(currentTile.first) * mapWidth + (currentTile.second - 1)].first == '.') //left
+						stack.emplace(std::make_pair(currentTile.first, currentTile.second - 1));
+
+					if (map[(currentTile.first) * mapWidth + (currentTile.second + 1)].first == '.') //right
+						stack.emplace(std::make_pair(currentTile.first, currentTile.second + 1));
+				}
+
+				id++;
+			}
+		}
+	}
+}
+
 //precondition: CanPlaceTunnel(x,y) == true
 void RandomLevelGenerator::GeneratePassageWays(const uint32_t xOrigin, const uint32_t yOrigin, const int32_t id)
 {
@@ -326,7 +414,6 @@ RandomLevelGenerator::~RandomLevelGenerator()
 	map = nullptr;
 }
 
-//TODO: cleanup
 void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t& spawnX, uint32_t& spawnY)
 {
 	int32_t id = -1;
@@ -340,92 +427,8 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t
 		}
 	}
 
-	//TODO: turn placeRooms and Mergerooms routines into a separate method
-
-	//place rooms randomly
-	std::uniform_int_distribution<> roomHeightDistr(1, maxRoomHeight);
-	std::uniform_int_distribution<> roomWidthDistr(1, maxRoomWidth);
-
-	//hopefully x and y are not swapped lol
-	std::uniform_int_distribution<uint32_t> roomX(1, mapWidth - 1);
-	std::uniform_int_distribution<uint32_t> roomY(1, mapHeight - 1);
-
-	bool playerPlaced = false;
-	id = 0;
-	for (uint8_t i = 0; i < roomPlaceAttempts; i++)
-	{
-		int roomHeight = roomHeightDistr(gen);
-		int roomWidth = roomWidthDistr(gen);
-
-		uint32_t roomColumn = roomX(gen);
-		uint32_t roomRow = roomY(gen);
-
-		//TODO: just make this roomHeight not roomHeight * 2
-		//i was fucking high when i wrote this aight
-		for (int y = -roomHeight; y <= roomHeight; y++)
-		{
-			int yOffset = y + roomRow;
-
-			if (yOffset < 1 || yOffset >= mapHeight - 1) continue;
-
-			for (int x = -roomWidth; x <= roomWidth; x++)
-			{
-				int xOffset = x + roomColumn;
-				
-				if (xOffset < 1 || xOffset >= mapWidth - 1) continue;
-
-				map[yOffset * mapWidth + xOffset].first = '.';
-				map[yOffset * mapWidth + xOffset].second = id;
-			}
-		}
-
-		if (!playerPlaced)
-		{
-			spawnX = roomColumn;
-			spawnY = roomRow;
-			playerPlaced = true;
-		}
-	}
-
-	int32_t unsetId = id;
-	id++;
-
-	//merge rooms
-	for (uint32_t y = 1; y < mapHeight - 1; y++)
-	{
-		for (uint32_t x = 1; x < mapWidth - 1; x++)
-		{
-			if (map[y * mapWidth + x].first == '.' && map[y * mapWidth + x].second == unsetId)
-			{
-				std::stack<std::pair<uint32_t, uint32_t>> stack;
-				stack.emplace(std::make_pair(y, x));
-
-				while (!stack.empty())
-				{
-					std::pair<uint32_t, uint32_t> currentTile = stack.top();
-					stack.pop();
-
-					if (map[currentTile.first * mapWidth + currentTile.second].second != unsetId) continue;
-
-					map[currentTile.first * mapWidth + currentTile.second].second = id;
-
-					if (map[(currentTile.first - 1) * mapWidth + currentTile.second].first == '.') //up
-						stack.emplace(std::make_pair(currentTile.first - 1, currentTile.second));
-
-					if (map[(currentTile.first + 1) * mapWidth + currentTile.second].first == '.') //down
-						stack.emplace(std::make_pair(currentTile.first + 1, currentTile.second));
-
-					if (map[(currentTile.first) * mapWidth + (currentTile.second - 1)].first == '.') //left
-						stack.emplace(std::make_pair(currentTile.first, currentTile.second - 1));
-
-					if (map[(currentTile.first) * mapWidth + (currentTile.second + 1)].first == '.') //right
-						stack.emplace(std::make_pair(currentTile.first, currentTile.second + 1));
-				}
-
-				id++;			
-			}
-		}
-	}
+	//generate room layout
+	GenerateRooms(spawnX, spawnY, id);
 
 	//floodfill
 	for (uint32_t y = 1; y < mapHeight - 1; y++)
@@ -443,24 +446,19 @@ void RandomLevelGenerator::GenerateRandomLevel(std::wstring& stringMap, uint32_t
 		}
 	}
 
+	//create connections between rooms and passageways
 	CreateConnections();
 
-	//trim ends
+	//trim unnecessarily long ends of passageways
 	TrimEnds(15);
-
-	//remove unnecessary walls?
-
-	map[spawnY * mapWidth + spawnX].first = '$';
 	
+	//transfer map over to stringmap
 	stringMap.clear();
-
 	for (uint32_t y = 0; y < mapHeight; y++)
 	{
 		for (uint32_t x = 0; x < mapWidth; x++)
 		{
 			stringMap += map[y * mapWidth + x].first;
 		}
-
-		//stringMap += L"\n";
 	}
 }

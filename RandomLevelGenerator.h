@@ -111,6 +111,7 @@ private:
 	template <typename T>
 	typename std::list<T>::iterator GetRandomElement(std::list<T> &list);
 
+	void GenerateRooms(uint32_t &spawnX, uint32_t &spawnY, int32_t &id);
 	void GeneratePassageWays(const uint32_t x, const uint32_t y, const int32_t id);
 	void CreateConnections();
 	void TrimEnds(const uint8_t iterations);
