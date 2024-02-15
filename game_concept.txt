@@ -1,0 +1,28 @@
+possible idea:
+The game revolves around 10 floors of randomly generated dungeon.
+The dungeon is almost completely dark. The player can without light see only a few feet in front of them
+The player can use a torch to light up the area. But be warned: light attracts unwanted attention.
+
+Torch:
+Torches are items that can be picked up. When used, they provide extra visibility to make navigation easier.
+
+Apperture of nightvision:
+The apperture of nightvision is a special item. When used, it produces a snapshot of the players current vision
+with nightvision, creating a picture that shows the visible area with nightvision. The apperture has a cooldown.
+
+Throwable rocks:
+Can be thrown. Produce an audible noise when hitting something.
+
+inventory?
+
+The entity:
+The entity is a creature that stalks the dungeon looking for victims. Players have no way of killing the entity
+so they spend the game avoiding it.
+-pathing behaviour?
+
+Other enemies?
+
+Keys?
+
+Doors?
+

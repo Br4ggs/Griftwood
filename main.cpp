@@ -1,19 +1,28 @@
 #include <stdio.h>
+#include <iostream>
 #include <string>
 #include <cmath>
 #include <vector>
 #include <algorithm>
+#include <bit>
 
 #include <SDL.h>
 #include <SDL_image.h>
+
+#include "RandomLevelGenerator.h"
+
+//BUGBUG: player can walk through some walls diagonally
+//		  -might be related to collision code around map bounds?
+
+//TODO: rendered world is mirrored in x-axis, but this shouldn't be an immediate problem
 
 //Screen dimension constants
 const int SCREEN_WIDTH = 640;
 const int SCREEN_HEIGHT = 480;
 
 //Game constants
-const int mapHeight = 16;
-const int mapWidth = 16;
+const uint32_t mapHeight = 40;
+const uint32_t mapWidth = 40;
 
 const float FOV = 3.14159 / 4.0;
 const float maxDepth = 12.0f;
@@ -25,6 +34,11 @@ const float walkSpeed = 5.0f;
 float playerX = 8.5f;
 float playerY = 7.5f;
 float playerA = 0.0f;
+
+bool quit = false;
+SDL_Event e;
+
+RandomLevelGenerator levelGenerator(mapWidth, mapHeight, 5, 5, 25);
 
 std::wstring map;
 
@@ -63,6 +77,94 @@ void sortSprites(std::vector<int>& order, std::vector<float>& distance, int coun
 
 void render();
 
+//preliminary check to ensure player never goes out of bounds of array, also ensures x stays in range
+bool OutOfBounds(float playerX, float playerY)
+{
+	return playerX < 1 || playerX > mapWidth - 1 || playerY < 1 || playerY > mapHeight - 1;
+}
+
+void PrintMap(std::wstring map, uint32_t mapWidth, uint32_t mapHeight)
+{
+	for (uint32_t y = 0; y < mapHeight; y++)
+	{
+		std::wcout << map.substr((uint64_t)y * mapWidth, mapWidth) << std::endl;
+	}
+}
+
+void ProcessInput(const float deltaTime)
+{
+	//also TODO: only process one input event per loop iteration
+	while (SDL_PollEvent(&e) != 0)
+	{
+		if (e.type == SDL_QUIT)
+		{
+			quit = true;
+		}
+	}
+
+	//rotation
+	if (keystates[SDL_SCANCODE_Q])
+	{
+		playerA -= 1.0f * deltaTime;
+	}
+	if (keystates[SDL_SCANCODE_E])
+	{
+		playerA += 1.0f * deltaTime;
+	}
+
+	//forward/backward
+	if (keystates[SDL_SCANCODE_W])
+	{
+		playerX += sinf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
+		playerY += cosf(playerA) * walkSpeed * deltaTime;
+
+		if (OutOfBounds(playerX, playerY) ||
+			map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
+		{
+			playerX -= sinf(playerA) * walkSpeed * deltaTime;
+			playerY -= cosf(playerA) * walkSpeed * deltaTime;
+		}
+	}
+	if (keystates[SDL_SCANCODE_S])
+	{
+		playerX -= sinf(playerA) * walkSpeed * deltaTime;
+		playerY -= cosf(playerA) * walkSpeed * deltaTime;
+
+		if (OutOfBounds(playerX, playerY) ||
+			map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
+		{
+			playerX += sinf(playerA) * walkSpeed * deltaTime;
+			playerY += cosf(playerA) * walkSpeed * deltaTime;
+		}
+	}
+
+	//strafing
+	if (keystates[SDL_SCANCODE_D])
+	{
+		playerX += cosf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
+		playerY -= sinf(playerA) * walkSpeed * deltaTime;
+
+		if (OutOfBounds(playerX, playerY) ||
+			map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
+		{
+			playerX -= cosf(playerA) * walkSpeed * deltaTime;
+			playerY += sinf(playerA) * walkSpeed * deltaTime;
+		}
+	}
+	if (keystates[SDL_SCANCODE_A])
+	{
+		playerX -= cosf(playerA) * walkSpeed * deltaTime;
+		playerY += sinf(playerA) * walkSpeed * deltaTime;
+
+		if (OutOfBounds(playerX, playerY) ||
+			map[(uint64_t)playerY * mapWidth + (uint32_t)playerX] == '#')
+		{
+			playerX += cosf(playerA) * walkSpeed * deltaTime;
+			playerY -= sinf(playerA) * walkSpeed * deltaTime;
+		}
+	}
+}
+
 //drawing each pixel individually is super slow
 int main(int argc, char* args[])
 {
@@ -72,23 +174,37 @@ int main(int argc, char* args[])
 		return -1;
 	}
 
+	//BUGBUG: something weird going on with this map, check spawn position
+	uint32_t spawnX = 8;
+	uint32_t spawnY = 7;
+
+	levelGenerator.GenerateRandomLevel(map, spawnX, spawnY);
+
+
+	//somehow we're still spawning in walls
+	//we might have misaligned the generator coordinates with the rendering coordinates
+	playerX = static_cast<float>(spawnX) + 0.5f;
+	playerY = static_cast<float>(spawnY) + 0.5f;
+	//playerX = spawnX + 0.5f;
+	//playerY = spawnY + 0.5f;
+
 	//create map
-	map += L"################";
-	map += L"#..............#";
-	map += L"#.##.#.#.#.#.#.#";
-	map += L"#.#............#";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"#......#.#......";
-	map += L"#...............";
-	map += L"#......#.#......";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"#...........####";
-	map += L"#..............#";
-	map += L"#..............#";
-	map += L"################";
+	//map += L"################";
+	//map += L"#..............#";
+	//map += L"#.##.#.#.#.#.#.#";
+	//map += L"#.#............#";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"#......#.#.....#";
+	//map += L"#..............#";
+	//map += L"#......#.#.....#";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"#..........#...#";
+	//map += L"#...........####";
+	//map += L"#..............#";
+	//map += L"#..............#";
+	//map += L"################";
 
 	//create objects inside map
 	objects =
@@ -102,8 +218,8 @@ int main(int argc, char* args[])
 		{9.0, 14.0, barrelSprite}
 	};
 
-	bool quit = false;
-	SDL_Event e;
+	PrintMap(map, mapWidth, mapHeight);
+	std::printf("X: %f Y: %f\n", playerX, playerY);
 
 	Uint32 ticksCount = 0;
 	while (!quit)
@@ -113,74 +229,7 @@ int main(int argc, char* args[])
 		float deltaTime = (SDL_GetTicks() - ticksCount) / 1000.0f;
 		ticksCount = SDL_GetTicks();
 
-		//TODO: input code for moving player
-		//also TODO: only process one input event per loop iteration
-		while (SDL_PollEvent(&e) != 0)
-		{
-			if (e.type == SDL_QUIT)
-			{
-				quit = true;
-			}
-		}
-
-		//rotation
-		if (keystates[SDL_SCANCODE_Q])
-		{
-			playerA -= 1.0f * deltaTime;
-		}
-		if (keystates[SDL_SCANCODE_E])
-		{
-			playerA += 1.0f * deltaTime;
-		}
-
-		//forward/backward
-		if (keystates[SDL_SCANCODE_W])
-		{
-			playerX += sinf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
-			playerY += cosf(playerA) * walkSpeed * deltaTime;
-
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
-			{
-				playerX -= sinf(playerA) * walkSpeed * deltaTime;
-				playerY -= cosf(playerA) * walkSpeed * deltaTime;
-			}
-		}
-		if (keystates[SDL_SCANCODE_S])
-		{
-			playerX -= sinf(playerA) * walkSpeed * deltaTime;
-			playerY -= cosf(playerA) * walkSpeed * deltaTime;
-
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
-			{
-				playerX += sinf(playerA) * walkSpeed * deltaTime;
-				playerY += cosf(playerA) * walkSpeed * deltaTime;
-			}
-		}
-
-		//strafing
-		if (keystates[SDL_SCANCODE_D])
-		{
-			playerX += cosf(playerA) * walkSpeed * deltaTime; //shouldn't these be the other way around?
-			playerY -= sinf(playerA) * walkSpeed * deltaTime;
-
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
-			{
-				playerX -= cosf(playerA) * walkSpeed * deltaTime;
-				playerY += sinf(playerA) * walkSpeed * deltaTime;
-			}
-		}
-		if (keystates[SDL_SCANCODE_A])
-		{
-			playerX -= cosf(playerA) * walkSpeed * deltaTime;
-			playerY += sinf(playerA) * walkSpeed * deltaTime;
-
-			if (map[(int)playerY * mapWidth + (int)playerX] == '#')
-			{
-				playerX += cosf(playerA) * walkSpeed * deltaTime;
-				playerY -= sinf(playerA) * walkSpeed * deltaTime;
-			}
-		}
-
+		ProcessInput(deltaTime);
 
 		// main loop
 		//TODO: later using GPU rendering
