@@ -26,3 +26,11 @@ Keys?
 
 Doors?
 
+Other resources:
+https://opengameart.org/
+https://www.areyep.com/RIPandMCS-TextureLibrary-Floorceilingtextures.html
+https://www.reedbeta.com/blog/texture-gathers-and-coordinate-precision/
+
+cool effect to maybe do for a loading screen or something?
+https://lodev.org/cgtutor/tunnel.html
+
